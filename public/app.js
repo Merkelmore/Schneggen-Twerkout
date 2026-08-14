@@ -10,6 +10,9 @@ import {
   sortRecords,
   todaySummary,
 } from './data.js';
+import { enableWSpeech, swapRs } from './w-speech.js';
+
+enableWSpeech();
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
@@ -447,7 +450,7 @@ function editRecord(id) {
 
 function deleteRecord(id) {
   const record = records.find((item) => item.id === id);
-  if (!record || !window.confirm(`Delete this ${record.exercise} set?`)) return;
+  if (!record || !window.confirm(swapRs(`Delete this ${record.exercise} set?`))) return;
   records = records.filter((item) => item.id !== id);
   persist();
   if (editingId === id) resetForm({ preserveExercise: false });
@@ -543,7 +546,7 @@ $('#importInput').addEventListener('change', async (event) => {
 
   try {
     const imported = parseBackup(await file.text());
-    if (!window.confirm(`Replace this browser’s ${records.length} sets with ${imported.length} imported sets?`)) {
+    if (!window.confirm(swapRs(`Replace this browser’s ${records.length} sets with ${imported.length} imported sets?`))) {
       return;
     }
     records = imported;
