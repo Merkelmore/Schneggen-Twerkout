@@ -1,0 +1,41 @@
+name: schneggen-twerkout
+
+services:
+  web:
+    image: schneggen-twerkout:${APP_REVISION:?Set APP_REVISION to the exact Git revision}
+    build:
+      context: .
+    container_name: schneggen-twerkout-web
+    restart: unless-stopped
+    read_only: true
+    user: "65532:65532"
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    environment:
+      XDG_CONFIG_HOME: /tmp/caddy/config
+      XDG_DATA_HOME: /tmp/caddy/data
+    expose:
+      - "8080"
+    networks:
+      - gateway
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/healthz | grep -qx ok"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          pids: 64
+
+networks:
+  gateway:
+    external: true
+    name: production_gateway
+

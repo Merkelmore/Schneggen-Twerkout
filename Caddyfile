@@ -1,0 +1,22 @@
+{
+  admin off
+  auto_https off
+}
+
+:8080 {
+  root * /srv
+  encode zstd gzip
+
+  header {
+    -Server
+    Cache-Control "no-cache"
+    Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
+    Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    Referrer-Policy "no-referrer"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+  }
+
+  file_server
+}
+
