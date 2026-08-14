@@ -11,6 +11,7 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - workout streaks, today's summary, editable history, and custom exercise names;
 - local-only storage with JSON export/import;
 - installable, offline-capable phone experience;
+- playful display mode that turns every `r`/`R` into `w`/`W` without changing saved workout data;
 - no accounts, analytics, advertising, or remote workout database.
 
 ## Local checks

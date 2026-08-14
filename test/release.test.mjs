@@ -9,16 +9,18 @@ test('ships the full workout tracker interface', async () => {
   assert.match(html, /Schneggen-/);
   assert.match(html, /Progress, unlocked\./);
   assert.match(html, /id="setForm"/);
-  assert.match(html, /src="\/app\.js"/);
+  assert.match(html, /src="\/app\.js\?v=2"/);
   assert.doesNotMatch(html, /available soon/i);
 });
 
 test('keeps health and install assets stable', async () => {
   assert.equal((await read('public/healthz')).trim(), 'ok');
   const manifest = JSON.parse(await read('public/manifest.webmanifest'));
-  assert.equal(manifest.name, 'Schneggen-Twerkout');
+  assert.equal(manifest.name, 'Schneggen-Twewkout');
   assert.equal(manifest.display, 'standalone');
-  assert.match(await read('public/sw.js'), /schneggen-twerkout-v1/);
+  assert.doesNotMatch(`${manifest.name}${manifest.short_name}${manifest.description}`, /r/i);
+  assert.match(await read('public/sw.js'), /schneggen-twerkout-v2/);
+  assert.match(await read('public/sw.js'), /w-speech\.js/);
 });
 
 test('uses no remote scripts, analytics, or fonts', async () => {
