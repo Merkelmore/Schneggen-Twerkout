@@ -2,25 +2,239 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#fff7ec">
-    <meta name="description" content="A cute, free workout tracker with progress graphs.">
-    <title>Schneggen-Twerkout — coming soon</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#fff8ee">
+    <meta name="description" content="A cute, private workout tracker with free progress graphs.">
+    <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <link rel="manifest" href="/manifest.webmanifest">
     <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
   </head>
   <body>
-    <main class="card">
-      <div class="glow" aria-hidden="true"></div>
-      <img class="snail" src="/snail.svg" alt="A smiling pastel snail">
-      <p class="eyebrow">slow progress still counts</p>
-      <h1>Schneggen-<span>Twerkout</span></h1>
-      <p class="message">Your cute little workout tracker is crawling this way.</p>
-      <div class="trail" aria-label="Coming soon">
-        <span></span><span></span><span></span>
-      </div>
-      <p class="soon">available soon</p>
-    </main>
+    <div class="app-shell">
+      <header class="app-header">
+        <a class="brand" href="#log" aria-label="Schneggen-Twerkout home">
+          <img src="/snail.svg" alt="" width="52" height="52">
+          <span>
+            <strong>Schneggen-<em>Twerkout</em></strong>
+            <small>slow progress still counts</small>
+          </span>
+        </a>
+        <button class="icon-button install-button" id="installButton" type="button" hidden>
+          Install
+        </button>
+      </header>
+
+      <nav class="tab-bar" aria-label="Main navigation">
+        <button class="tab is-active" type="button" data-view="log" aria-current="page">
+          <span aria-hidden="true">＋</span> Log
+        </button>
+        <button class="tab" type="button" data-view="progress">
+          <span aria-hidden="true">↗</span> Progress
+        </button>
+        <button class="tab" type="button" data-view="history">
+          <span aria-hidden="true">◷</span> History
+        </button>
+      </nav>
+
+      <main>
+        <section class="view is-active" id="logView" data-view-panel="log">
+          <div class="today-card">
+            <div>
+              <p class="eyebrow">Today’s trail</p>
+              <h1>Keep crawling.</h1>
+            </div>
+            <img src="/snail.svg" alt="" class="tiny-snail">
+            <dl class="today-stats">
+              <div><dt>Sets</dt><dd id="todaySets">0</dd></div>
+              <div><dt>Moves</dt><dd id="todayExercises">0</dd></div>
+              <div><dt>Volume</dt><dd><span id="todayVolume">0</span><small> kg</small></dd></div>
+              <div><dt>Streak</dt><dd><span id="streakCount">0</span><small> days</small></dd></div>
+            </dl>
+          </div>
+
+          <section class="panel log-panel" aria-labelledby="logTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">New set</p>
+                <h2 id="logTitle">What did you do?</h2>
+              </div>
+              <button class="text-button" id="cancelEditButton" type="button" hidden>Cancel edit</button>
+            </div>
+
+            <form id="setForm">
+              <div class="field-row">
+                <label class="field field-wide">
+                  <span>Exercise</span>
+                  <input id="exerciseInput" name="exercise" list="exerciseOptions" maxlength="80" placeholder="e.g. Hip thrust" autocomplete="off" required>
+                  <datalist id="exerciseOptions">
+                    <option value="Hip thrust"></option>
+                    <option value="Squat"></option>
+                    <option value="Deadlift"></option>
+                    <option value="Bench press"></option>
+                    <option value="Lat pulldown"></option>
+                    <option value="Plank"></option>
+                    <option value="Running"></option>
+                  </datalist>
+                </label>
+                <label class="field">
+                  <span>Tracked as</span>
+                  <select id="typeSelect" name="type">
+                    <option value="strength">Weight × reps</option>
+                    <option value="reps">Reps only</option>
+                    <option value="duration">Time</option>
+                    <option value="distance">Distance</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="metric-fields">
+                <label class="field metric-field" data-field="weight">
+                  <span>Weight</span>
+                  <span class="input-unit">
+                    <input id="weightInput" name="weight" type="number" min="0" max="100000" step="0.25" inputmode="decimal" placeholder="0">
+                    <small>kg</small>
+                  </span>
+                </label>
+                <label class="field metric-field" data-field="reps">
+                  <span>Reps</span>
+                  <input id="repsInput" name="reps" type="number" min="1" max="100000" step="1" inputmode="numeric" placeholder="8">
+                </label>
+                <label class="field metric-field" data-field="duration" hidden>
+                  <span>Time</span>
+                  <span class="input-unit">
+                    <input id="durationInput" name="duration" type="number" min="0.1" max="10080" step="0.1" inputmode="decimal" placeholder="10">
+                    <small>min</small>
+                  </span>
+                </label>
+                <label class="field metric-field" data-field="distance" hidden>
+                  <span>Distance</span>
+                  <span class="input-unit">
+                    <input id="distanceInput" name="distance" type="number" min="0.01" max="100000" step="0.01" inputmode="decimal" placeholder="5">
+                    <small>km</small>
+                  </span>
+                </label>
+              </div>
+
+              <div class="field-row">
+                <label class="field">
+                  <span>When</span>
+                  <input id="dateInput" name="date" type="datetime-local" required>
+                </label>
+                <label class="field field-wide">
+                  <span>Note <small>optional</small></span>
+                  <input id="notesInput" name="notes" maxlength="240" placeholder="Felt strong ✨">
+                </label>
+              </div>
+
+              <button class="primary-button" type="submit">
+                <img src="/snail.svg" alt=""> <span id="saveButtonLabel">Save set</span>
+              </button>
+            </form>
+          </section>
+
+          <section class="panel recent-panel" aria-labelledby="recentTitle">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Fresh tracks</p>
+                <h2 id="recentTitle">Latest sets</h2>
+              </div>
+            </div>
+            <div id="recentList" class="set-list"></div>
+          </section>
+        </section>
+
+        <section class="view" id="progressView" data-view-panel="progress" hidden>
+          <div class="section-heading">
+            <p class="eyebrow">Your pace</p>
+            <h1>Progress, unlocked.</h1>
+          </div>
+
+          <section class="panel progress-panel">
+            <div class="progress-controls">
+              <label class="field">
+                <span>Exercise</span>
+                <select id="progressExercise"></select>
+              </label>
+              <label class="field">
+                <span>Graph</span>
+                <select id="progressMetric"></select>
+              </label>
+            </div>
+
+            <dl class="progress-stats">
+              <div><dt>Latest</dt><dd id="latestValue">—</dd></div>
+              <div><dt>Best</dt><dd id="bestValue">—</dd></div>
+              <div><dt>Change</dt><dd id="changeValue">—</dd></div>
+              <div><dt>Sets</dt><dd id="totalSets">0</dd></div>
+            </dl>
+
+            <div class="chart-wrap" id="chartWrap">
+              <svg id="progressChart" viewBox="0 0 720 300" role="img" aria-labelledby="chartTitle chartDescription">
+                <title id="chartTitle">Exercise progress</title>
+                <desc id="chartDescription">A line graph of the selected workout metric over time.</desc>
+              </svg>
+              <div class="empty-state" id="chartEmpty">
+                <img src="/snail.svg" alt="">
+                <strong>No trail yet.</strong>
+                <span>Log a set to start the graph.</span>
+              </div>
+            </div>
+          </section>
+
+          <aside class="nudge-card">
+            <span class="shell-icon" aria-hidden="true">◎</span>
+            <div>
+              <strong>Small steps add up.</strong>
+              <p id="progressNudge">Your graph grows with every set.</p>
+            </div>
+          </aside>
+        </section>
+
+        <section class="view" id="historyView" data-view-panel="history" hidden>
+          <div class="section-heading">
+            <p class="eyebrow">Your trail</p>
+            <h1>Workout history</h1>
+          </div>
+
+          <section class="panel">
+            <div class="history-toolbar">
+              <label class="field">
+                <span>Show</span>
+                <select id="historyFilter">
+                  <option value="all">All exercises</option>
+                </select>
+              </label>
+              <span class="record-count" id="recordCount">0 sets</span>
+            </div>
+            <div id="historyList" class="history-list"></div>
+          </section>
+
+          <section class="panel backup-panel" aria-labelledby="backupTitle">
+            <div>
+              <p class="eyebrow">Keep it safe</p>
+              <h2 id="backupTitle">Your data, your device.</h2>
+              <p>Export a backup before switching browsers or phones.</p>
+            </div>
+            <div class="backup-actions">
+              <button class="secondary-button" id="exportButton" type="button">Export</button>
+              <label class="secondary-button file-button">
+                Import
+                <input id="importInput" type="file" accept="application/json,.json">
+              </label>
+            </div>
+          </section>
+        </section>
+      </main>
+
+      <footer>
+        <img src="/snail.svg" alt="">
+        <span>made for steady little wins</span>
+      </footer>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </body>
 </html>
-
