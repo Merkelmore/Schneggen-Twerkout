@@ -11,7 +11,7 @@
 
 ## Persistence and backup
 
-Workout data is browser-local and is never written to the server. The app provides JSON export/import for user-controlled backup. Production has no application data volume to back up.
+Workout data, presets, and active-workout state are browser-local and are never written to the server. JSON export/import backs up sets and presets; an in-progress workout is intentionally device-session state and is not exported. Production has no application data volume to back up.
 
 ## Release
 

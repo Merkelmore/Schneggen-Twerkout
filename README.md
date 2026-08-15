@@ -9,7 +9,9 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - one-set-at-a-time logging for weight and reps, reps only, time, or distance;
 - progress graphs with daily bests, latest result, personal best, and percentage change;
 - workout streaks, today's summary, editable history, and custom exercise names;
-- local-only storage with JSON export/import;
+- editable workout presets with three first-visit starter routines and active-workout progress;
+- last-time weight and reps shown and prefilled when an exercise is opened from a workout;
+- local-only storage for sets, presets, and active workouts with JSON export/import for sets and presets;
 - installable, offline-capable phone experience;
 - playful display mode that turns every `r`/`R` into `w`/`W` without changing saved workout data;
 - no accounts, analytics, advertising, or remote workout database.
