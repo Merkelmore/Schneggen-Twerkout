@@ -9,8 +9,9 @@ import {
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js';
+} from './data.js?v=3';
 import { enableWSpeech, swapRs } from './w-speech.js';
+import { createWorkoutController } from './workouts.js?v=3';
 
 enableWSpeech();
 
@@ -37,6 +38,8 @@ const toast = $('#toast');
 
 let records = loadRecords();
 let editingId = null;
+let workoutController;
+let workoutExerciseContext = null;
 let toastTimer;
 let installPrompt;
 
@@ -412,6 +415,7 @@ function renderAll() {
   renderRecent();
   renderExerciseControls();
   renderHistory();
+  workoutController?.render(records);
 }
 
 function resetForm({ preserveExercise = true } = {}) {
@@ -427,10 +431,41 @@ function resetForm({ preserveExercise = true } = {}) {
   updateMetricFields();
 }
 
+function clearWorkoutExerciseContext() {
+  workoutExerciseContext = null;
+  $('#lastPerformanceCard').hidden = true;
+}
+
+function prepareWorkoutExercise(context) {
+  const { name, previous } = context;
+  workoutExerciseContext = { name, previous };
+  form.reset();
+  editingId = null;
+  exerciseInput.value = name;
+  typeSelect.value = previous?.type && WORKOUT_TYPES[previous.type] ? previous.type : 'strength';
+  $('#weightInput').value = previous?.weight ?? '';
+  $('#repsInput').value = previous?.reps ?? '';
+  $('#durationInput').value = previous?.duration ? previous.duration / 60 : '';
+  $('#distanceInput').value = previous?.distance ?? '';
+  dateInput.value = toLocalInputValue();
+  $('#saveButtonLabel').textContent = 'Save set';
+  $('#cancelEditButton').hidden = true;
+  $('#lastPerformanceValue').textContent = previous ? formatSet(previous) : 'No previous set yet';
+  $('#lastPerformanceDate').textContent = previous
+    ? `Logged ${longDateFormat.format(new Date(previous.date))}`
+    : 'Your first set can start here.';
+  $('#lastPerformanceCard').hidden = false;
+  updateMetricFields();
+  showView('log');
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  exerciseInput.focus();
+}
+
 function editRecord(id) {
   const record = records.find((item) => item.id === id);
   if (!record) return;
 
+  clearWorkoutExerciseContext();
   editingId = id;
   exerciseInput.value = record.exercise;
   typeSelect.value = record.type;
@@ -506,21 +541,35 @@ form.addEventListener('submit', (event) => {
     return;
   }
 
-  if (editingId) {
+  const wasEditing = Boolean(editingId);
+  if (wasEditing) {
     records = records.map((record) => record.id === editingId ? candidate : record);
     showToast('Set updated 🐌');
   } else {
     records.push(candidate);
+    workoutController?.recordSaved(candidate);
     showToast('Set saved 🐌');
   }
 
   persist();
+  const workoutContext = workoutExerciseContext;
   resetForm();
+  if (workoutContext && !wasEditing) prepareWorkoutExercise(workoutContext);
   renderAll();
 });
 
 typeSelect.addEventListener('change', updateMetricFields);
-$('#cancelEditButton').addEventListener('click', () => resetForm({ preserveExercise: false }));
+$('#cancelEditButton').addEventListener('click', () => {
+  clearWorkoutExerciseContext();
+  resetForm({ preserveExercise: false });
+});
+$('#backToWorkoutButton').addEventListener('click', () => showView('workouts'));
+exerciseInput.addEventListener('input', () => {
+  if (workoutExerciseContext
+      && exerciseInput.value.trim().toLocaleLowerCase() !== workoutExerciseContext.name.toLocaleLowerCase()) {
+    clearWorkoutExerciseContext();
+  }
+});
 progressExercise.addEventListener('change', updateProgressMetrics);
 progressMetric.addEventListener('change', renderProgress);
 historyFilter.addEventListener('change', renderHistory);
@@ -530,7 +579,7 @@ $$('.tab').forEach((tab) => {
 });
 
 $('#exportButton').addEventListener('click', () => {
-  const blob = new Blob([serialiseBackup(records)], { type: 'application/json' });
+  const blob = new Blob([serialiseBackup(records, { presets: workoutController.getPresets() })], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -545,11 +594,15 @@ $('#importInput').addEventListener('change', async (event) => {
   if (!file) return;
 
   try {
-    const imported = parseBackup(await file.text());
-    if (!window.confirm(swapRs(`Replace this browser’s ${records.length} sets with ${imported.length} imported sets?`))) {
+    const text = await file.text();
+    const imported = parseBackup(text);
+    const importedPresets = workoutController.previewImport(text);
+    const presetCopy = importedPresets === null ? '' : ` and ${importedPresets.length} presets`;
+    if (!window.confirm(swapRs(`Replace this browser’s ${records.length} sets with ${imported.length} imported sets${presetCopy}?`))) {
       return;
     }
     records = imported;
+    workoutController.importFromBackup(text);
     persist();
     renderAll();
     showToast('Backup imported.');
@@ -579,13 +632,22 @@ window.addEventListener('appinstalled', () => {
   showToast('Installed. Tiny victory!');
 });
 
+workoutController = createWorkoutController({
+  formatRecord: formatSet,
+  onLogExercise: prepareWorkoutExercise,
+  onShowView: showView,
+  onToast: showToast,
+});
+
 dateInput.value = toLocalInputValue();
 updateMetricFields();
 renderAll();
 
-const initialView = ['log', 'progress', 'history'].includes(location.hash.slice(1))
-  ? location.hash.slice(1)
-  : 'log';
+const requestedView = location.hash.slice(1);
+const availableViews = ['workouts', 'log', 'progress', 'history'];
+const initialView = availableViews.includes(requestedView)
+  ? requestedView
+  : workoutController.shouldShowFirstVisit() ? 'workouts' : 'log';
 showView(initialView);
 
 if ('serviceWorker' in navigator) {

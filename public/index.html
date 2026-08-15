@@ -8,9 +8,9 @@
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=2">
-    <link rel="stylesheet" href="/styles.css">
-    <script type="module" src="/app.js?v=2"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=3">
+    <link rel="stylesheet" href="/styles.css?v=3">
+    <script type="module" src="/app.js?v=3"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -28,6 +28,9 @@
       </header>
 
       <nav class="tab-bar" aria-label="Main navigation">
+        <button class="tab" type="button" data-view="workouts">
+          <span aria-hidden="true">◎</span> Workout
+        </button>
         <button class="tab is-active" type="button" data-view="log" aria-current="page">
           <span aria-hidden="true">＋</span> Log
         </button>
@@ -40,6 +43,78 @@
       </nav>
 
       <main>
+        <section class="view" id="workoutsView" data-view-panel="workouts" hidden>
+          <div class="section-heading heading-with-action">
+            <div>
+              <p class="eyebrow">Ready to move</p>
+              <h1>Pick a workout.</h1>
+            </div>
+            <button class="secondary-button" id="newPresetButton" type="button">New preset</button>
+          </div>
+
+          <section class="welcome-card" id="firstVisitCard" hidden>
+            <div>
+              <p class="eyebrow">Welcome, little snail</p>
+              <h2>Start in one tap.</h2>
+              <p>Pick a starter workout below, or make your own. Every preset stays editable.</p>
+              <button class="text-button" id="dismissFirstVisitButton" type="button">Got it</button>
+            </div>
+            <img src="/snail.svg" alt="">
+          </section>
+
+          <section class="panel active-workout-panel" id="activeWorkoutPanel" hidden>
+            <div class="panel-heading active-workout-heading">
+              <div>
+                <p class="eyebrow">In progress</p>
+                <h2 id="activeWorkoutName">Workout</h2>
+                <p id="activeWorkoutMeta" class="active-workout-meta"></p>
+              </div>
+              <button class="text-button" id="finishWorkoutButton" type="button">Finish</button>
+            </div>
+            <div class="workout-progress" aria-hidden="true">
+              <span id="activeWorkoutProgress"></span>
+            </div>
+            <div class="active-exercise-list" id="activeExerciseList"></div>
+          </section>
+
+          <section class="panel preset-library">
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Saved routines</p>
+                <h2>Your presets</h2>
+              </div>
+            </div>
+            <div class="preset-grid" id="presetList"></div>
+          </section>
+
+          <section class="panel preset-editor" id="presetEditor" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="eyebrow">Build your trail</p>
+                <h2 id="presetEditorTitle">New preset</h2>
+              </div>
+              <button class="text-button" id="cancelPresetButton" type="button">Cancel</button>
+            </div>
+            <form id="presetForm">
+              <label class="field">
+                <span>Preset name</span>
+                <input id="presetNameInput" maxlength="60" placeholder="e.g. Glute day" required>
+              </label>
+              <div class="preset-exercise-builder">
+                <label class="field">
+                  <span>Add exercise</span>
+                  <input id="presetExerciseInput" list="exerciseOptions" maxlength="80" placeholder="e.g. Hip thrust" autocomplete="off">
+                </label>
+                <button class="secondary-button" id="addPresetExerciseButton" type="button">Add</button>
+              </div>
+              <div class="preset-draft-list" id="presetDraftList"></div>
+              <button class="primary-button" type="submit">
+                <img src="/snail.svg" alt=""> Save preset
+              </button>
+            </form>
+          </section>
+        </section>
+
         <section class="view is-active" id="logView" data-view-panel="log">
           <div class="today-card">
             <div>
@@ -89,6 +164,16 @@
                   </select>
                 </label>
               </div>
+
+              <aside class="last-performance-card" id="lastPerformanceCard" hidden>
+                <span class="shell-icon" aria-hidden="true">↺</span>
+                <div>
+                  <span>Last time</span>
+                  <strong id="lastPerformanceValue">No previous set yet</strong>
+                  <small id="lastPerformanceDate"></small>
+                </div>
+                <button class="text-button" id="backToWorkoutButton" type="button">Back to workout</button>
+              </aside>
 
               <div class="metric-fields">
                 <label class="field metric-field" data-field="weight">
