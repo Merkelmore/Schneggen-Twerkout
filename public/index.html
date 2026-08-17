@@ -8,12 +8,36 @@
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=3">
-    <link rel="stylesheet" href="/styles.css?v=3">
-    <script type="module" src="/app.js?v=3"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=4">
+    <link rel="stylesheet" href="/styles.css?v=4">
+    <script type="module" src="/app.js?v=4"></script>
   </head>
   <body>
-    <div class="app-shell">
+    <section class="profile-gate" id="profileGate" aria-labelledby="profileTitle">
+      <div class="profile-card">
+        <img class="profile-snail" src="/snail.svg" alt="">
+        <p class="eyebrow">Private on this device</p>
+        <h1 id="profileTitle">Who is crawling?</h1>
+        <p class="profile-intro">Enter your name. No password.</p>
+        <form id="profileForm" class="profile-form">
+          <label class="field">
+            <span>Name</span>
+            <input id="profileNameInput" name="name" maxlength="40" autocomplete="name" placeholder="Petra" required>
+          </label>
+          <button class="primary-button" type="submit">
+            <img src="/snail.svg" alt=""> Continue
+          </button>
+        </form>
+        <div class="saved-profiles" aria-labelledby="savedProfilesLabel">
+          <span id="savedProfilesLabel">Saved here</span>
+          <div id="profileButtons"></div>
+        </div>
+        <p class="profile-message" id="profileMessage" role="alert"></p>
+        <small class="profile-note">A name keeps workouts separate on this browser. It is not a password.</small>
+      </div>
+    </section>
+
+    <div class="app-shell" id="appShell" hidden>
       <header class="app-header">
         <a class="brand" href="#log" aria-label="Schneggen-Twerkout home">
           <img src="/snail.svg" alt="" width="52" height="52">
@@ -22,9 +46,15 @@
             <small>slow progress still counts</small>
           </span>
         </a>
-        <button class="icon-button install-button" id="installButton" type="button" hidden>
-          Install
-        </button>
+        <div class="header-actions">
+          <button class="profile-button" id="profileButton" type="button" aria-label="Switch profile">
+            <span aria-hidden="true">&#9673;</span>
+            <span id="currentProfileName">Petra</span>
+          </button>
+          <button class="icon-button install-button" id="installButton" type="button" hidden>
+            Install
+          </button>
+        </div>
       </header>
 
       <nav class="tab-bar" aria-label="Main navigation">

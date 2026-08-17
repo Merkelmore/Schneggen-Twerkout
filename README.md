@@ -11,10 +11,11 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - workout streaks, today's summary, editable history, and custom exercise names;
 - editable workout presets with three first-visit starter routines and active-workout progress;
 - last-time weight and reps shown and prefilled when an exercise is opened from a workout;
+- local name profiles with a pre-created Petra profile and separate workout spaces;
 - local-only storage for sets, presets, and active workouts with JSON export/import for sets and presets;
 - installable, offline-capable phone experience;
 - playful display mode that turns every `r`/`R` into `w`/`W` without changing saved workout data;
-- no accounts, analytics, advertising, or remote workout database.
+- no passwords, analytics, advertising, or remote workout database.
 
 ## Local checks
 
@@ -30,4 +31,4 @@ Open `http://localhost:8080` and check `http://localhost:8080/healthz`.
 
 ## Privacy and backups
 
-Workout records stay in that browser's local storage. They are not sent to the server. Export a JSON backup before clearing browser data or changing devices; Import restores that file in another browser.
+Profile names and workout records stay in that browser's local storage. They are not sent to the server. A name-only profile is a convenience, not secure authentication. Export the current profile's JSON backup before clearing browser data or changing devices; Import restores that file in another browser profile.

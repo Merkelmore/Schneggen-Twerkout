@@ -9,9 +9,10 @@ import {
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js?v=3';
+} from './data.js?v=4';
 import { enableWSpeech, swapRs } from './w-speech.js';
-import { createWorkoutController } from './workouts.js?v=3';
+import { createProfileManager } from './profiles.js?v=4';
+import { createWorkoutController } from './workouts.js?v=4';
 
 enableWSpeech();
 
@@ -26,6 +27,51 @@ const longDateFormat = new Intl.DateTimeFormat(undefined, {
   year: 'numeric',
 });
 const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+
+const profileManager = createProfileManager();
+
+function showProfileGate() {
+  const gate = $('#profileGate');
+  const form = $('#profileForm');
+  const input = $('#profileNameInput');
+  const message = $('#profileMessage');
+  const buttons = $('#profileButtons');
+
+  $('#appShell').hidden = true;
+  gate.hidden = false;
+  buttons.replaceChildren();
+
+  const signIn = (name) => {
+    try {
+      profileManager.signIn(name);
+      location.reload();
+    } catch (error) {
+      message.textContent = error.message || 'This profile could not be saved.';
+      input.focus();
+    }
+  };
+
+  profileManager.getProfiles().forEach((profile) => {
+    const button = document.createElement('button');
+    button.className = 'saved-profile-button';
+    button.type = 'button';
+    button.textContent = profile.name;
+    button.addEventListener('click', () => signIn(profile.name));
+    buttons.append(button);
+  });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    signIn(input.value);
+  });
+  input.focus();
+}
+
+function startTracker(profile) {
+  const profileStorage = profileManager.storageFor(profile);
+  $('#profileGate').hidden = true;
+  $('#appShell').hidden = false;
+  $('#currentProfileName').textContent = profile.name;
 
 const form = $('#setForm');
 const exerciseInput = $('#exerciseInput');
@@ -45,7 +91,7 @@ let installPrompt;
 
 function loadRecords() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+    const parsed = JSON.parse(profileStorage.getItem(STORAGE_KEY) || '[]');
     if (!Array.isArray(parsed)) return [];
     return sortRecords(parsed.map(normaliseRecord).filter(Boolean));
   } catch {
@@ -56,7 +102,7 @@ function loadRecords() {
 function persist() {
   records = sortRecords(records);
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+    profileStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   } catch {
     showToast('Storage is full. Export a backup.');
   }
@@ -632,11 +678,18 @@ window.addEventListener('appinstalled', () => {
   showToast('Installed. Tiny victory!');
 });
 
+$('#profileButton').addEventListener('click', () => {
+  profileManager.signOut();
+  location.hash = '';
+  location.reload();
+});
+
 workoutController = createWorkoutController({
   formatRecord: formatSet,
   onLogExercise: prepareWorkoutExercise,
   onShowView: showView,
   onToast: showToast,
+  storage: profileStorage,
 });
 
 dateInput.value = toLocalInputValue();
@@ -653,3 +706,8 @@ showView(initialView);
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
 }
+}
+
+const activeProfile = profileManager.getActiveProfile();
+if (activeProfile) startTracker(activeProfile);
+else showProfileGate();
