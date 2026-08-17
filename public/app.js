@@ -9,10 +9,10 @@ import {
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js?v=5';
-import { enableWSpeech, swapRs } from './w-speech.js?v=5';
-import { createProfileManager } from './profiles.js?v=5';
-import { createWorkoutController } from './workouts.js?v=5';
+} from './data.js?v=6';
+import { enableWSpeech, swapRs } from './w-speech.js?v=6';
+import { createProfileManager } from './profiles.js?v=6';
+import { createWorkoutController } from './workouts.js?v=6';
 
 enableWSpeech();
 
@@ -185,10 +185,12 @@ function makeBlank(title, copy) {
   const strong = document.createElement('strong');
   strong.textContent = title;
 
-  const span = document.createElement('span');
-  span.textContent = copy;
-
-  blank.append(image, strong, span);
+  blank.append(image, strong);
+  if (copy) {
+    const span = document.createElement('span');
+    span.textContent = copy;
+    blank.append(span);
+  }
   return blank;
 }
 
@@ -254,7 +256,7 @@ function renderRecent() {
   const list = $('#recentList');
   list.replaceChildren();
   if (!records.length) {
-    list.append(makeBlank('No sets yet.', 'Your first little track starts here.'));
+    list.append(makeBlank('No sets yet.'));
     return;
   }
   records.slice(0, 4).forEach((record) => list.append(makeSetItem(record)));
@@ -417,11 +419,11 @@ function renderProgress() {
   $('#totalSets').textContent = exerciseRecords.length;
 
   if (change > 0) {
-    $('#progressNudge').textContent = `Up ${numberFormat.format(change)}% from your first logged day.`;
+    $('#progressNudge').textContent = `+${numberFormat.format(change)}% since first day.`;
   } else if (series.length > 1) {
-    $('#progressNudge').textContent = 'Consistency is progress too. Keep crawling.';
+    $('#progressNudge').textContent = 'No change yet.';
   } else {
-    $('#progressNudge').textContent = 'Your graph grows with every set.';
+    $('#progressNudge').textContent = 'Log another set to compare.';
   }
 
   renderChart(series);
@@ -438,7 +440,7 @@ function renderHistory() {
   $('#recordCount').textContent = `${visible.length} ${visible.length === 1 ? 'set' : 'sets'}`;
 
   if (!visible.length) {
-    list.append(makeBlank('Nothing here yet.', 'Log a set and it will stay on this trail.'));
+    list.append(makeBlank('No sets yet.'));
     return;
   }
 
@@ -675,7 +677,7 @@ $('#installButton').addEventListener('click', async () => {
 
 window.addEventListener('appinstalled', () => {
   $('#installButton').hidden = true;
-  showToast('Installed. Tiny victory!');
+  showToast('Installed.');
 });
 
 $('#profileButton').addEventListener('click', () => {

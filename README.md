@@ -1,6 +1,6 @@
 # Schneggen-Twerkout
 
-A small, snail-themed workout tracker where progress graphs are free.
+A snail-themed workout tracker with local profiles, presets, and progress graphs.
 
 Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 

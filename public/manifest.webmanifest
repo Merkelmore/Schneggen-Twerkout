@@ -1,7 +1,7 @@
 {
   "name": "Schneggen-Twerkout",
   "short_name": "Twerkout",
-  "description": "A cute, private workout tracker with free progress graphs.",
+  "description": "Workout tracking with presets and progress graphs.",
   "start_url": "/#log",
   "display": "standalone",
   "background_color": "#fff8ee",

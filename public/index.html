@@ -4,21 +4,20 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#fff8ee">
-    <meta name="description" content="A cute, private workout tracker with free progress graphs.">
+    <meta name="description" content="Workout tracking with presets and progress graphs.">
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=5">
-    <link rel="stylesheet" href="/styles.css?v=5">
-    <script type="module" src="/app.js?v=5"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=6">
+    <link rel="stylesheet" href="/styles.css?v=6">
+    <script type="module" src="/app.js?v=6"></script>
   </head>
   <body>
     <section class="profile-gate" id="profileGate" aria-labelledby="profileTitle">
       <div class="profile-card">
         <img class="profile-snail" src="/snail.svg" alt="">
-        <p class="eyebrow">Private on this device</p>
         <h1 id="profileTitle">Who is crawling?</h1>
-        <p class="profile-intro">Enter your name. No password.</p>
+        <p class="profile-intro">No password.</p>
         <form id="profileForm" class="profile-form">
           <label class="field">
             <span>Name</span>
@@ -29,11 +28,11 @@
           </button>
         </form>
         <div class="saved-profiles" aria-labelledby="savedProfilesLabel">
-          <span id="savedProfilesLabel">Saved here</span>
+          <span id="savedProfilesLabel">Profiles</span>
           <div id="profileButtons"></div>
         </div>
         <p class="profile-message" id="profileMessage" role="alert"></p>
-        <small class="profile-note">A name keeps workouts separate on this browser. It is not a password.</small>
+        <small class="profile-note">Saved on this device.</small>
       </div>
     </section>
 
@@ -43,7 +42,6 @@
           <img src="/snail.svg" alt="" width="52" height="52">
           <span>
             <strong>Schneggen-<em>Twerkout</em></strong>
-            <small>slow progress still counts</small>
           </span>
         </a>
         <div class="header-actions">
@@ -76,17 +74,14 @@
         <section class="view" id="workoutsView" data-view-panel="workouts" hidden>
           <div class="section-heading heading-with-action">
             <div>
-              <p class="eyebrow">Ready to move</p>
-              <h1>Pick a workout.</h1>
+              <h1>Workouts</h1>
             </div>
             <button class="secondary-button" id="newPresetButton" type="button">New preset</button>
           </div>
 
           <section class="welcome-card" id="firstVisitCard" hidden>
             <div>
-              <p class="eyebrow">Welcome, little snail</p>
-              <h2>Start in one tap.</h2>
-              <p>Pick a starter workout below, or make your own. Every preset stays editable.</p>
+              <h2>Choose a preset.</h2>
               <button class="text-button" id="dismissFirstVisitButton" type="button">Got it</button>
             </div>
             <img src="/snail.svg" alt="">
@@ -110,8 +105,7 @@
           <section class="panel preset-library">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">Saved routines</p>
-                <h2>Your presets</h2>
+                <h2>Presets</h2>
               </div>
             </div>
             <div class="preset-grid" id="presetList"></div>
@@ -120,7 +114,6 @@
           <section class="panel preset-editor" id="presetEditor" hidden>
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">Build your trail</p>
                 <h2 id="presetEditorTitle">New preset</h2>
               </div>
               <button class="text-button" id="cancelPresetButton" type="button">Cancel</button>
@@ -148,8 +141,7 @@
         <section class="view is-active" id="logView" data-view-panel="log">
           <div class="today-card">
             <div>
-              <p class="eyebrow">Today’s trail</p>
-              <h1>Keep crawling.</h1>
+              <h1>Today</h1>
             </div>
             <img src="/snail.svg" alt="" class="tiny-snail">
             <dl class="today-stats">
@@ -163,8 +155,7 @@
           <section class="panel log-panel" aria-labelledby="logTitle">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">New set</p>
-                <h2 id="logTitle">What did you do?</h2>
+                <h2 id="logTitle">Log set</h2>
               </div>
               <button class="text-button" id="cancelEditButton" type="button" hidden>Cancel edit</button>
             </div>
@@ -240,7 +231,7 @@
                 </label>
                 <label class="field field-wide">
                   <span>Note <small>optional</small></span>
-                  <input id="notesInput" name="notes" maxlength="240" placeholder="Felt strong ✨">
+                  <input id="notesInput" name="notes" maxlength="240" placeholder="Optional note">
                 </label>
               </div>
 
@@ -253,7 +244,6 @@
           <section class="panel recent-panel" aria-labelledby="recentTitle">
             <div class="panel-heading">
               <div>
-                <p class="eyebrow">Fresh tracks</p>
                 <h2 id="recentTitle">Latest sets</h2>
               </div>
             </div>
@@ -263,8 +253,7 @@
 
         <section class="view" id="progressView" data-view-panel="progress" hidden>
           <div class="section-heading">
-            <p class="eyebrow">Your pace</p>
-            <h1>Progress, unlocked.</h1>
+            <h1>Progress</h1>
           </div>
 
           <section class="panel progress-panel">
@@ -293,8 +282,8 @@
               </svg>
               <div class="empty-state" id="chartEmpty">
                 <img src="/snail.svg" alt="">
-                <strong>No trail yet.</strong>
-                <span>Log a set to start the graph.</span>
+                <strong>No data yet.</strong>
+                <span>Log a set.</span>
               </div>
             </div>
           </section>
@@ -302,16 +291,14 @@
           <aside class="nudge-card">
             <span class="shell-icon" aria-hidden="true">◎</span>
             <div>
-              <strong>Small steps add up.</strong>
-              <p id="progressNudge">Your graph grows with every set.</p>
+              <p id="progressNudge">Log another set to compare.</p>
             </div>
           </aside>
         </section>
 
         <section class="view" id="historyView" data-view-panel="history" hidden>
           <div class="section-heading">
-            <p class="eyebrow">Your trail</p>
-            <h1>Workout history</h1>
+            <h1>History</h1>
           </div>
 
           <section class="panel">
@@ -329,9 +316,8 @@
 
           <section class="panel backup-panel" aria-labelledby="backupTitle">
             <div>
-              <p class="eyebrow">Keep it safe</p>
-              <h2 id="backupTitle">Your data, your device.</h2>
-              <p>Export a backup before switching browsers or phones.</p>
+              <h2 id="backupTitle">Backup</h2>
+              <p>For another browser or phone.</p>
             </div>
             <div class="backup-actions">
               <button class="secondary-button" id="exportButton" type="button">Export</button>
@@ -344,10 +330,7 @@
         </section>
       </main>
 
-      <footer>
-        <img src="/snail.svg" alt="">
-        <span>made for steady little wins</span>
-      </footer>
+
     </div>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
