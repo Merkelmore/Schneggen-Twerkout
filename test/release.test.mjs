@@ -20,7 +20,7 @@ test('ships the full workout tracker interface', async () => {
 });
 
 test('keeps health and install assets stable', async () => {
-  assert.equal((await read('public/healthz')).trim(), 'ok');
+  assert.equal(await read('public/healthz'), 'ok\n');
   const manifest = JSON.parse(await read('public/manifest.webmanifest'));
   assert.equal(manifest.name, 'Schneggen-Twewkout');
   assert.equal(manifest.display, 'standalone');
