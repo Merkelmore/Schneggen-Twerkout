@@ -8,7 +8,7 @@
 - Public edge: the shared Hetzner Caddy gateway on `production_gateway`
 - DNS: Porkbun record `schnegge.strotzenheim.com` points to the shared Hetzner IPv4 address
 - External dependencies: none at runtime beyond DNS and the shared gateway
-- Display speech: a small curated set of interface words uses playful r-to-w spellings; stored profile names and workout data are unchanged
+- Interface: concise labels with a small curated set of playful r-to-w spellings; stored profile names and workout data are unchanged
 
 ## Persistence and backup
 

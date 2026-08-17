@@ -10,8 +10,8 @@ import {
   normalisePresets,
   parsePresetBackup,
   startWorkout,
-} from './presets.js?v=5';
-import { swapRs } from './w-speech.js?v=5';
+} from './presets.js?v=6';
+import { swapRs } from './w-speech.js?v=6';
 
 const element = (tag, className, text) => {
   const node = document.createElement(tag);
@@ -161,11 +161,7 @@ export function createWorkoutController({
       const image = document.createElement('img');
       image.src = '/snail.svg';
       image.alt = '';
-      blank.append(
-        image,
-        element('strong', null, 'No presets yet.'),
-        element('span', null, 'Make one from your favorite exercises.'),
-      );
+      blank.append(image, element('strong', null, 'No presets yet.'));
       presetList.append(blank);
       return;
     }
