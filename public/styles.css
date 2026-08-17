@@ -473,6 +473,8 @@ select:focus {
 
 .progress-panel { padding-bottom: 20px; }
 
+.compact-heading { margin-bottom: 18px; }
+
 .progress-controls { margin-bottom: 18px; }
 
 .progress-stats {
@@ -492,7 +494,8 @@ select:focus {
     repeating-linear-gradient(0deg, transparent 0 49px, rgba(73,59,77,.05) 50px);
 }
 
-#progressChart {
+#progressChart,
+#volumeChart {
   display: block;
   width: 100%;
   height: auto;
@@ -512,7 +515,7 @@ select:focus {
   stroke-width: 5;
 }
 
-.chart-area { fill: url(#chartGradient); }
+.chart-area { pointer-events: none; }
 
 .chart-point {
   fill: #fff;
@@ -525,6 +528,38 @@ select:focus {
   font-family: inherit;
   font-size: 13px;
   font-weight: 700;
+}
+
+.volume-timeline {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.volume-entry {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fff;
+}
+
+.volume-entry span,
+.volume-entry small {
+  overflow: hidden;
+  color: var(--ink-soft);
+  font-size: .7rem;
+  font-weight: 750;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.volume-entry strong {
+  font-size: 1rem;
+  letter-spacing: -.025em;
 }
 
 .empty-state {
@@ -744,7 +779,10 @@ a:focus-visible,
 
   .chart-wrap { min-height: 260px; }
 
-  #progressChart { min-height: 250px; }
+  #progressChart,
+  #volumeChart { min-height: 250px; }
+
+  .volume-timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 
   .backup-panel {
     align-items: stretch;

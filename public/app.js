@@ -7,14 +7,16 @@ import {
   mergeRecords,
   normaliseRecord,
   parseBackup,
+  presetVolumeSeries,
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js?v=8';
-import { enableWSpeech, swapRs } from './w-speech.js?v=8';
-import { createProfileManager } from './profiles.js?v=8';
-import { prepareProfileStorage } from './sync.js?v=8';
-import { createWorkoutController } from './workouts.js?v=8';
+  weeklyVolumeSeries,
+} from './data.js?v=9';
+import { enableWSpeech, swapRs } from './w-speech.js?v=9';
+import { createProfileManager } from './profiles.js?v=9';
+import { prepareProfileStorage } from './sync.js?v=9';
+import { createWorkoutController } from './workouts.js?v=9';
 
 enableWSpeech();
 
@@ -84,6 +86,8 @@ const typeSelect = $('#typeSelect');
 const dateInput = $('#dateInput');
 const progressExercise = $('#progressExercise');
 const progressMetric = $('#progressMetric');
+const volumeMode = $('#volumeMode');
+const volumePreset = $('#volumePreset');
 const historyFilter = $('#historyFilter');
 const toast = $('#toast');
 
@@ -144,6 +148,10 @@ function formatValue(value, metric) {
     .flatMap((type) => type.metrics)
     .find((item) => item.value === metric);
   return `${numberFormat.format(value)} ${config?.unit || ''}`.trim();
+}
+
+function formatVolume(value) {
+  return `${numberFormat.format(value)} kg`;
 }
 
 function updateMetricFields() {
@@ -310,16 +318,112 @@ function updateProgressMetrics() {
   renderProgress();
 }
 
+function renderVolumePresetOptions() {
+  const selected = volumePreset.value;
+  const presets = workoutController?.getPresets() ?? [];
+  const presetIds = new Set(presets.map((preset) => preset.id));
+  records.forEach((record) => {
+    if (!record.presetId || presetIds.has(record.presetId)) return;
+    presetIds.add(record.presetId);
+    presets.push({ id: record.presetId, name: record.workoutName || 'Previous preset' });
+  });
+  volumePreset.replaceChildren();
+
+  presets.forEach((preset) => {
+    const option = document.createElement('option');
+    option.value = preset.id;
+    option.textContent = preset.name;
+    volumePreset.append(option);
+  });
+
+  if ([...volumePreset.options].some((option) => option.value === selected)) {
+    volumePreset.value = selected;
+  } else {
+    const latestPresetId = records.find((record) => record.workoutId && record.presetId)?.presetId;
+    if ([...volumePreset.options].some((option) => option.value === latestPresetId)) {
+      volumePreset.value = latestPresetId;
+    }
+  }
+  volumePreset.disabled = presets.length === 0;
+}
+
+function renderVolumeTimeline(series, byPreset) {
+  const timeline = $('#volumeTimeline');
+  timeline.replaceChildren();
+  series.slice(-6).reverse().forEach((point) => {
+    const item = document.createElement('div');
+    item.className = 'volume-entry';
+    const label = document.createElement('span');
+    const dateLabel = shortDateFormat.format(new Date(`${point.day}T12:00:00`));
+    label.textContent = byPreset ? dateLabel : `Week of ${dateLabel}`;
+    const value = document.createElement('strong');
+    value.textContent = formatVolume(point.value);
+    const sets = document.createElement('small');
+    sets.textContent = `${point.sets} ${point.sets === 1 ? 'set' : 'sets'}`;
+    item.append(label, value, sets);
+    timeline.append(item);
+  });
+}
+
+function renderVolumeProgress() {
+  const byPreset = volumeMode.value === 'preset';
+  $('#volumePresetField').hidden = !byPreset;
+  const series = byPreset
+    ? presetVolumeSeries(records, volumePreset.value)
+    : weeklyVolumeSeries(records);
+  const latest = series.at(-1)?.value;
+  const previous = series.at(-2)?.value;
+  const best = series.length ? Math.max(...series.map((point) => point.value)) : null;
+  const change = previous && latest !== undefined ? ((latest - previous) / previous) * 100 : null;
+
+  $('#volumeLatest').textContent = latest === undefined ? '\u2014' : formatVolume(latest);
+  $('#volumeBest').textContent = best === null ? '\u2014' : formatVolume(best);
+  $('#volumeChange').textContent = change === null
+    ? '\u2014'
+    : `${change > 0 ? '+' : ''}${numberFormat.format(change)}%`;
+  $('#volumeCountLabel').textContent = byPreset ? 'Workouts' : 'Weeks';
+  $('#volumeCount').textContent = series.length;
+
+  renderChart(series, {
+    svg: $('#volumeChart'),
+    empty: $('#volumeChartEmpty'),
+    gradientId: 'volumeChartGradient',
+    title: byPreset ? 'Preset workout volume' : 'Weekly workout volume',
+    description: byPreset
+      ? 'Total kilograms lifted in each recorded preset workout.'
+      : 'Total kilograms lifted in each week.',
+  });
+  renderVolumeTimeline(series, byPreset);
+}
+
+function renderVolumeControls() {
+  renderVolumePresetOptions();
+  renderVolumeProgress();
+}
+
 function svgElement(name, attributes = {}) {
   const element = document.createElementNS('http://www.w3.org/2000/svg', name);
   Object.entries(attributes).forEach(([key, value]) => element.setAttribute(key, value));
   return element;
 }
 
-function renderChart(series) {
-  const svg = $('#progressChart');
-  const empty = $('#chartEmpty');
+function renderChart(series, {
+  svg = $('#progressChart'),
+  empty = $('#chartEmpty'),
+  gradientId = 'chartGradient',
+  title = 'Exercise progress',
+  description = 'The selected workout metric over time.',
+  xLabel = (point) => shortDateFormat.format(new Date(`${point.day}T12:00:00`)),
+} = {}) {
   svg.replaceChildren();
+  const titleElement = svgElement('title');
+  const descriptionElement = svgElement('desc');
+  titleElement.id = `${svg.id}Title`;
+  descriptionElement.id = `${svg.id}Description`;
+  titleElement.textContent = title;
+  descriptionElement.textContent = description;
+  svg.setAttribute('aria-labelledby', `${titleElement.id} ${descriptionElement.id}`);
+  svg.append(titleElement, descriptionElement);
 
   if (!series.length) {
     svg.hidden = true;
@@ -351,7 +455,7 @@ function renderChart(series) {
   const yAt = (value) => top + chartHeight - ((value - yMin) / (yMax - yMin)) * chartHeight;
 
   const defs = svgElement('defs');
-  const gradient = svgElement('linearGradient', { id: 'chartGradient', x1: '0', x2: '0', y1: '0', y2: '1' });
+  const gradient = svgElement('linearGradient', { id: gradientId, x1: '0', x2: '0', y1: '0', y2: '1' });
   gradient.append(
     svgElement('stop', { offset: '0%', 'stop-color': '#e278a3', 'stop-opacity': '.28' }),
     svgElement('stop', { offset: '100%', 'stop-color': '#e278a3', 'stop-opacity': '0' }),
@@ -374,7 +478,7 @@ function renderChart(series) {
   const polylinePoints = points.map(([x, y]) => `${x},${y}`).join(' ');
   const areaPath = `M ${points[0][0]} ${top + chartHeight} L ${polylinePoints.replaceAll(' ', ' L ')} L ${points.at(-1)[0]} ${top + chartHeight} Z`;
 
-  svg.append(svgElement('path', { class: 'chart-area', d: areaPath }));
+  svg.append(svgElement('path', { class: 'chart-area', d: areaPath, fill: `url(#${gradientId})` }));
   svg.append(svgElement('polyline', { class: 'chart-line', points: polylinePoints }));
 
   points.forEach(([x, y]) => {
@@ -401,7 +505,7 @@ function renderChart(series) {
       y: height - 16,
       'text-anchor': index === 0 && series.length > 1 ? 'start' : index === series.length - 1 ? 'end' : 'middle',
     });
-    label.textContent = shortDateFormat.format(new Date(`${series[index].day}T12:00:00`));
+    label.textContent = xLabel(series[index]);
     svg.append(label);
   });
 }
@@ -467,6 +571,7 @@ function renderAll() {
   renderSummary();
   renderRecent();
   renderExerciseControls();
+  renderVolumeControls();
   renderHistory();
   workoutController?.render(records);
 }
@@ -572,7 +677,10 @@ function showView(name) {
   });
 
   history.replaceState(null, '', `#${name}`);
-  if (name === 'progress') renderProgress();
+  if (name === 'progress') {
+    renderVolumeProgress();
+    renderProgress();
+  }
   if (name === 'history') renderHistory();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
@@ -597,6 +705,10 @@ form.addEventListener('submit', (event) => {
     duration: $('#durationInput').value ? Number($('#durationInput').value) * 60 : null,
     distance: $('#distanceInput').value,
     notes: $('#notesInput').value,
+    workoutId: existing?.workoutId || workoutExerciseContext?.workoutId,
+    presetId: existing?.presetId || workoutExerciseContext?.presetId,
+    workoutName: existing?.workoutName || workoutExerciseContext?.workoutName,
+    workoutStartedAt: existing?.workoutStartedAt || workoutExerciseContext?.workoutStartedAt,
     createdAt: existing?.createdAt,
   });
 
@@ -643,6 +755,8 @@ exerciseInput.addEventListener('input', () => {
 });
 progressExercise.addEventListener('change', updateProgressMetrics);
 progressMetric.addEventListener('change', renderProgress);
+volumeMode.addEventListener('change', renderVolumeProgress);
+volumePreset.addEventListener('change', renderVolumeProgress);
 historyFilter.addEventListener('change', renderHistory);
 
 $$('.tab').forEach((tab) => {

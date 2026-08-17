@@ -1,6 +1,6 @@
 import { DatabaseSync } from 'node:sqlite';
 
-import { mergeRecords, normaliseRecord, parseBackup, sortRecords } from '../public/data.js';
+import { localDayKey, mergeRecords, normaliseRecord, parseBackup, sortRecords } from '../public/data.js';
 import {
   createStarterPresets,
   normaliseActiveWorkout,
@@ -120,4 +120,34 @@ export function importProfileBackup(database, rawName, text) {
     records: mergeRecords(current.state.records, importedRecords),
     presets: mergePresets(current.state.presets, importedPresets),
   });
+}
+
+export function tagProfileWorkoutDay(database, rawName, rawPresetName, rawDay) {
+  const day = String(rawDay ?? '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)
+      || localDayKey(`${day}T12:00:00.000Z`) !== day) {
+    throw new TypeError('Use a valid workout day in YYYY-MM-DD format.');
+  }
+  const presetName = String(rawPresetName ?? '').trim().toLocaleLowerCase();
+  const current = getOrCreateProfile(database, rawName);
+  const preset = current.state.presets.find(
+    (item) => item.name.toLocaleLowerCase() === presetName,
+  );
+  if (!preset) throw new TypeError('Preset not found.');
+
+  const workoutId = `legacy-${day}-${preset.id}`.slice(0, 80);
+  let tagged = 0;
+  const records = current.state.records.map((record) => {
+    if (record.workoutId || localDayKey(record.date) !== day) return record;
+    tagged += 1;
+    return {
+      ...record,
+      workoutId,
+      presetId: preset.id,
+      workoutName: preset.name,
+      workoutStartedAt: `${day}T12:00:00.000Z`,
+    };
+  });
+  const saved = saveProfileState(database, rawName, { ...current.state, records });
+  return { tagged, workoutId, state: saved.state };
 }

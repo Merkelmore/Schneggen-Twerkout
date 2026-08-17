@@ -1,12 +1,12 @@
-import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=8';
+import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=9';
 import {
   ACTIVE_WORKOUT_STORAGE_KEY,
   FIRST_VISIT_STORAGE_KEY,
   PRESET_STORAGE_KEY,
   normaliseActiveWorkout,
   normalisePresets,
-} from './presets.js?v=8';
-import { normaliseProfileName } from './profiles.js?v=8';
+} from './presets.js?v=9';
+import { normaliseProfileName } from './profiles.js?v=9';
 
 const SYNC_META_PREFIX = 'schneggen-server-sync-v1:';
 

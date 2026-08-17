@@ -13,8 +13,8 @@ import {
   normalisePresets,
   parsePresetBackup,
   startWorkout,
-} from './presets.js?v=8';
-import { swapRs } from './w-speech.js?v=8';
+} from './presets.js?v=9';
+import { swapRs } from './w-speech.js?v=9';
 
 const EXERCISE_LIBRARY = [
   'Around the World',
@@ -206,6 +206,10 @@ export function createWorkoutController({
       plannedSet,
       setNumber: completed + 1,
       totalSets: exercise.plannedSets.length,
+      workoutId: active.id,
+      presetId: active.presetId,
+      workoutName: active.name,
+      workoutStartedAt: active.startedAt,
     };
   }
 
