@@ -8,18 +8,20 @@ services:
     container_name: schneggen-twerkout-web
     restart: unless-stopped
     read_only: true
-    user: "65532:65532"
+    user: "1000:1000"
     security_opt:
       - no-new-privileges:true
     cap_drop:
       - ALL
     environment:
-      XDG_CONFIG_HOME: /tmp/caddy/config
-      XDG_DATA_HOME: /tmp/caddy/data
+      PORT: "8080"
+      SCHNEGGEN_DB_PATH: /data/schneggen.sqlite
     expose:
       - "8080"
     networks:
       - gateway
+    volumes:
+      - data:/data
     tmpfs:
       - /tmp:size=16m,mode=1777
     healthcheck:
@@ -31,11 +33,14 @@ services:
     deploy:
       resources:
         limits:
-          memory: 64M
+          memory: 96M
           pids: 64
+
+volumes:
+  data:
+    name: schneggen_twerkout_data
 
 networks:
   gateway:
     external: true
     name: production_gateway
-
