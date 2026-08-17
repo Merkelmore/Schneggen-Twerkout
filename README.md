@@ -1,6 +1,6 @@
 # Schneggen-Twerkout
 
-A snail-themed workout tracker with local profiles, presets, and progress graphs.
+A snail-themed workout tracker with synced profiles, presets, and progress graphs.
 
 Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 
@@ -11,24 +11,23 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - workout streaks, today's summary, editable history, and custom exercise names;
 - searchable workout presets with ordered exercises, planned set/weight/rep rows, three starter routines, and set-by-set progress;
 - last-time weight and reps shown and prefilled when an exercise is opened from a workout;
-- local name profiles with a pre-created Petra profile and separate workout spaces;
-- local-only storage for sets, presets, and active workouts with merge-safe JSON import/export;
+- server-backed name profiles with a pre-created Petra profile and separate workout spaces;
+- SQLite storage with a browser-local offline cache and merge-safe JSON import/export;
 - installable, offline-capable phone experience;
 - light Elmer Fudd-style wordplay on a few signature words such as `wowkout`, `pwogwess`, and `weady`, while ordinary wording and saved workout data keep their real r's;
-- no passwords, analytics, advertising, or remote workout database.
+- no passwords, analytics, advertising, Supabase, or third-party tracking.
 
 ## Local checks
 
-Requirements: Node.js 20+ and Docker.
+Requirements: Node.js 24+ and Docker.
 
 ```sh
 npm test
-docker build -t schneggen-twerkout:local .
-docker run --rm -p 8080:8080 schneggen-twerkout:local
+SCHNEGGEN_DB_PATH=./schneggen.sqlite npm start
 ```
 
 Open `http://localhost:8080` and check `http://localhost:8080/healthz`.
 
 ## Privacy and backups
 
-Profile names and workout records stay in that browser's local storage. They are not sent to the server. A name-only profile is a convenience, not secure authentication. Export the current profile's JSON backup before clearing browser data or changing devices; Import restores that file in another browser profile.
+Profile names and workout data are stored in the app's private SQLite volume and cached in the browser for offline use. A name-only profile is convenient, not secure authentication: anyone who knows a profile name can open and change it. JSON export/import remains available for personal copies.

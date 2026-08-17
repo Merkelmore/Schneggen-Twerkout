@@ -13,8 +13,8 @@ import {
   normalisePresets,
   parsePresetBackup,
   startWorkout,
-} from './presets.js?v=7';
-import { swapRs } from './w-speech.js?v=7';
+} from './presets.js?v=8';
+import { swapRs } from './w-speech.js?v=8';
 
 const EXERCISE_LIBRARY = [
   'Around the World',

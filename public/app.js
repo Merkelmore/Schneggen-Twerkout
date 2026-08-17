@@ -10,10 +10,11 @@ import {
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js?v=7';
-import { enableWSpeech, swapRs } from './w-speech.js?v=7';
-import { createProfileManager } from './profiles.js?v=7';
-import { createWorkoutController } from './workouts.js?v=7';
+} from './data.js?v=8';
+import { enableWSpeech, swapRs } from './w-speech.js?v=8';
+import { createProfileManager } from './profiles.js?v=8';
+import { prepareProfileStorage } from './sync.js?v=8';
+import { createWorkoutController } from './workouts.js?v=8';
 
 enableWSpeech();
 
@@ -68,8 +69,11 @@ function showProfileGate() {
   input.focus();
 }
 
-function startTracker(profile) {
-  const profileStorage = profileManager.storageFor(profile);
+async function startTracker(profile) {
+  const profileStorage = await prepareProfileStorage({
+    profile,
+    storage: profileManager.storageFor(profile),
+  });
   $('#profileGate').hidden = true;
   $('#appShell').hidden = false;
   $('#currentProfileName').textContent = profile.name;
@@ -725,10 +729,20 @@ const initialView = availableViews.includes(requestedView)
 showView(initialView);
 
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js'));
+  const registerServiceWorker = () => navigator.serviceWorker.register('/sw.js');
+  if (document.readyState === 'complete') registerServiceWorker();
+  else window.addEventListener('load', registerServiceWorker, { once: true });
 }
 }
 
-const activeProfile = profileManager.getActiveProfile();
-if (activeProfile) startTracker(activeProfile);
-else showProfileGate();
+async function boot() {
+  const activeProfile = profileManager.getActiveProfile();
+  if (activeProfile) {
+    $('#profileGate').hidden = true;
+    await startTracker(activeProfile);
+  } else {
+    showProfileGate();
+  }
+}
+
+boot();

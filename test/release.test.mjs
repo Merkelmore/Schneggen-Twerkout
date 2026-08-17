@@ -9,7 +9,7 @@ test('ships the full workout tracker interface', async () => {
   assert.match(html, /Schneggen-/);
   assert.match(html, />Progress</);
   assert.match(html, /id="setForm"/);
-  assert.match(html, /src="\/app\.js\?v=7"/);
+  assert.match(html, /src="\/app\.js\?v=8"/);
   assert.match(html, /id="workoutsView"/);
   assert.match(html, /id="presetForm"/);
   assert.match(html, /id="lastPerformanceCard"/);
@@ -31,11 +31,13 @@ test('keeps health and install assets stable', async () => {
   assert.equal(manifest.short_name, 'Twerkout');
   assert.equal(manifest.display, 'standalone');
   assert.match(manifest.description, /workout tracking with presets and progress graphs/i);
-  assert.match(await read('public/sw.js'), /schneggen-twerkout-v7/);
-  assert.match(await read('public/sw.js'), /presets\.js\?v=7/);
-  assert.match(await read('public/sw.js'), /workouts\.js\?v=7/);
-  assert.match(await read('public/sw.js'), /profiles\.js\?v=7/);
-  assert.match(await read('public/sw.js'), /w-speech\.js\?v=7/);
+  assert.match(await read('public/sw.js'), /schneggen-twerkout-v8/);
+  assert.match(await read('public/sw.js'), /presets\.js\?v=8/);
+  assert.match(await read('public/sw.js'), /workouts\.js\?v=8/);
+  assert.match(await read('public/sw.js'), /profiles\.js\?v=8/);
+  assert.match(await read('public/sw.js'), /sync\.js\?v=8/);
+  assert.match(await read('public/sw.js'), /w-speech\.js\?v=8/);
+  assert.match(await read('public/app.js'), /document\.readyState === 'complete'/);
 });
 
 test('uses no remote scripts, analytics, or fonts', async () => {
@@ -45,6 +47,7 @@ test('uses no remote scripts, analytics, or fonts', async () => {
     read('public/workouts.js'),
     read('public/presets.js'),
     read('public/profiles.js'),
+    read('public/sync.js'),
     read('public/w-speech.js'),
   ]);
   assert.doesNotMatch(html, /(?:src|href)="https?:\/\//);
@@ -60,12 +63,25 @@ test('production container is isolated on the shared gateway', async () => {
   assert.match(compose, /no-new-privileges:true/);
   assert.match(compose, /cap_drop:\s+\- ALL/);
   assert.match(compose, /name: production_gateway/);
+  assert.match(compose, /name: schneggen_twerkout_data/);
+  assert.match(compose, /\/data\/schneggen\.sqlite/);
   assert.doesNotMatch(compose, /ports:/);
 });
 
 test('server applies a restrictive content security policy', async () => {
-  const caddy = await read('Caddyfile');
-  assert.match(caddy, /Content-Security-Policy/);
-  assert.match(caddy, /default-src 'self'/);
-  assert.match(caddy, /frame-ancestors 'none'/);
+  const server = await read('server/http.mjs');
+  assert.match(server, /Content-Security-Policy/);
+  assert.match(server, /default-src 'self'/);
+  assert.match(server, /frame-ancestors 'none'/);
+});
+
+test('ships a dependency-free Node and SQLite service', async () => {
+  const docker = await read('Dockerfile');
+  const state = await read('server/state.mjs');
+  const manifest = JSON.parse(await read('package.json'));
+  assert.match(docker, /^FROM node:24\.19\.0-alpine/m);
+  assert.match(docker, /USER node/);
+  assert.match(state, /from 'node:sqlite'/);
+  assert.equal(manifest.engines.node, '>=24');
+  assert.equal(manifest.dependencies, undefined);
 });

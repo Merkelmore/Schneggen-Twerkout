@@ -3,7 +3,7 @@
 ## Product
 
 - Keep workout logging fast, friendly, and concise.
-- Preserve existing workout data when changing the browser storage schema.
+- Preserve existing workout data when changing browser or server storage.
 - Treat stored workout details as private user data. Do not add analytics, ads, or remote tracking.
 - Keep the app usable on a phone and accessible with a keyboard and screen reader.
 
@@ -11,6 +11,6 @@
 
 - Run `npm test` before proposing or releasing a revision.
 - Production releases use the immutable Git commit as the image tag.
-- Do not put secrets in this repository; the app is intentionally static and secret-free.
+- Do not put secrets in this repository; the name-only SQLite service uses no secrets.
 - Update `README.md` and `OPERATIONS.md` when behavior or the deployment contract changes.
 

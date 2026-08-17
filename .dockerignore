@@ -3,4 +3,6 @@
 node_modules
 coverage
 *.log
-
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
