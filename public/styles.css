@@ -983,6 +983,26 @@ a:focus-visible,
 }
 
 .preset-exercise-builder .secondary-button { min-height: 49px; }
+.exercise-picker {
+  display: flex;
+  gap: 7px;
+  margin-top: 9px;
+  overflow-x: auto;
+  padding: 2px 1px 5px;
+  scrollbar-width: thin;
+}
+
+.exercise-suggestion {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink-soft);
+  font-size: .75rem;
+  font-weight: 800;
+}
 
 .preset-draft-list {
   display: grid;
@@ -991,15 +1011,89 @@ a:focus-visible,
 }
 
 .draft-exercise {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  background: #fff;
+}
+
+.draft-exercise-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  padding: 9px 10px 9px 14px;
-  border-radius: 13px;
+}
+
+.draft-exercise-heading strong {
+  min-width: 0;
+  overflow: hidden;
+  font-size: .86rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.draft-exercise-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.planned-set-head,
+.planned-set-row {
+  display: grid;
+  grid-template-columns: 38px minmax(72px, 1fr) minmax(72px, 1fr) 34px;
+  align-items: center;
+  gap: 7px;
+}
+
+.planned-set-head {
+  padding: 0 3px;
+  color: var(--ink-soft);
+  font-size: .64rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.planned-set-list {
+  display: grid;
+  gap: 7px;
+}
+
+.planned-set-row input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--cream);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 800;
+  text-align: center;
+}
+
+.planned-set-number {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 10px;
   background: var(--purple-soft);
-  font-size: .82rem;
-  font-weight: 750;
+  font-size: .76rem;
+  font-weight: 900;
+}
+
+.add-planned-set {
+  min-height: 38px;
+  border: 0;
+  border-radius: 11px;
+  background: var(--purple-soft);
+  color: var(--ink-soft);
+  font-size: .76rem;
+  font-weight: 850;
 }
 
 .draft-empty {

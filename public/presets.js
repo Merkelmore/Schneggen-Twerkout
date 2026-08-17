@@ -1,6 +1,7 @@
 export const PRESET_STORAGE_KEY = 'schneggen-presets-v1';
 export const ACTIVE_WORKOUT_STORAGE_KEY = 'schneggen-active-workout-v1';
 export const FIRST_VISIT_STORAGE_KEY = 'schneggen-presets-welcomed-v1';
+export const MAX_PRESET_SETS = 12;
 
 const makeId = (prefix) => globalThis.crypto?.randomUUID?.()
   ?? `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -10,14 +11,42 @@ export const cleanExerciseName = (value) => String(value ?? '')
   .replace(/\s+/g, ' ')
   .slice(0, 80);
 
+const cleanPlanNumber = (value, { integer = false, min = 0 } = {}) => {
+  if (value === '' || value === null || value === undefined) return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < min || number > 100_000) return null;
+  return integer ? Math.round(number) : Math.round(number * 100) / 100;
+};
+
+export const normalisePlannedSet = (input = {}) => ({
+  weight: cleanPlanNumber(input?.weight),
+  reps: cleanPlanNumber(input?.reps, { integer: true, min: 1 }),
+});
+
+export const normalisePresetExercise = (input) => {
+  const name = cleanExerciseName(typeof input === 'string' ? input : input?.name);
+  if (!name) return null;
+
+  const suppliedSets = Array.isArray(input?.sets)
+    ? input.sets
+    : Array.isArray(input?.plannedSets) ? input.plannedSets : [];
+  const sets = suppliedSets.slice(0, MAX_PRESET_SETS).map(normalisePlannedSet);
+
+  return {
+    name,
+    sets: sets.length ? sets : [normalisePlannedSet()],
+  };
+};
+
 export const normalisePreset = (input = {}) => {
   const name = String(input.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
   const seen = new Set();
   const exercises = (Array.isArray(input.exercises) ? input.exercises : [])
-    .map((exercise) => cleanExerciseName(typeof exercise === 'string' ? exercise : exercise?.name))
+    .map(normalisePresetExercise)
     .filter((exercise) => {
-      const key = exercise.toLocaleLowerCase();
-      if (!exercise || seen.has(key)) return false;
+      if (!exercise) return false;
+      const key = exercise.name.toLocaleLowerCase();
+      if (seen.has(key)) return false;
       seen.add(key);
       return true;
     })
@@ -41,21 +70,23 @@ export const normalisePresets = (input) => (Array.isArray(input) ? input : [])
   .map(normalisePreset)
   .filter(Boolean);
 
+const starterExercise = (name) => ({ name, sets: [{}, {}, {}] });
+
 export const createStarterPresets = () => normalisePresets([
   {
     id: 'starter-full-body',
     name: 'Full body',
-    exercises: ['Squat', 'Bench press', 'Lat pulldown'],
+    exercises: ['Squat', 'Bench press', 'Lat pulldown'].map(starterExercise),
   },
   {
     id: 'starter-lower-body',
     name: 'Lower body',
-    exercises: ['Hip thrust', 'Squat', 'Deadlift'],
+    exercises: ['Hip thrust', 'Squat', 'Deadlift'].map(starterExercise),
   },
   {
     id: 'starter-upper-body',
     name: 'Upper body',
-    exercises: ['Bench press', 'Lat pulldown', 'Shoulder press'],
+    exercises: ['Bench press', 'Lat pulldown', 'Shoulder press'].map(starterExercise),
   },
 ]);
 
@@ -92,9 +123,10 @@ export const startWorkout = (preset, records, now = new Date()) => {
     name: cleanPreset.name,
     startedAt: new Date(now).toISOString(),
     updatedAt: new Date(now).toISOString(),
-    exercises: cleanPreset.exercises.map((name) => ({
-      name,
-      previous: previousSnapshot(latestExerciseSet(records, name)),
+    exercises: cleanPreset.exercises.map((exercise) => ({
+      name: exercise.name,
+      plannedSets: exercise.sets.map(normalisePlannedSet),
+      previous: previousSnapshot(latestExerciseSet(records, exercise.name)),
       completedSetIds: [],
     })),
   };
@@ -104,18 +136,26 @@ export const normaliseActiveWorkout = (input = {}) => {
   if (!input || !Array.isArray(input.exercises)) return null;
   const name = String(input.name ?? '').trim().slice(0, 60);
   const exercises = input.exercises
-    .map((exercise) => ({
-      name: cleanExerciseName(exercise?.name),
-      previous: exercise?.previous && typeof exercise.previous === 'object'
-        ? previousSnapshot(exercise.previous)
-        : null,
-      completedSetIds: [...new Set(
-        (Array.isArray(exercise?.completedSetIds) ? exercise.completedSetIds : [])
-          .map((id) => String(id).slice(0, 80))
-          .filter(Boolean),
-      )],
-    }))
-    .filter((exercise) => exercise.name);
+    .map((exercise) => {
+      const normalised = normalisePresetExercise({
+        name: exercise?.name,
+        sets: exercise?.plannedSets ?? exercise?.sets,
+      });
+      if (!normalised) return null;
+      return {
+        name: normalised.name,
+        plannedSets: normalised.sets,
+        previous: exercise?.previous && typeof exercise.previous === 'object'
+          ? previousSnapshot(exercise.previous)
+          : null,
+        completedSetIds: [...new Set(
+          (Array.isArray(exercise?.completedSetIds) ? exercise.completedSetIds : [])
+            .map((id) => String(id).slice(0, 80))
+            .filter(Boolean),
+        )],
+      };
+    })
+    .filter(Boolean);
 
   if (!name || !exercises.length) return null;
 

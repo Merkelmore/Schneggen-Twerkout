@@ -4,15 +4,16 @@ import {
   aggregateSeries,
   calculateStreak,
   localDayKey,
+  mergeRecords,
   normaliseRecord,
   parseBackup,
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js?v=6';
-import { enableWSpeech, swapRs } from './w-speech.js?v=6';
-import { createProfileManager } from './profiles.js?v=6';
-import { createWorkoutController } from './workouts.js?v=6';
+} from './data.js?v=7';
+import { enableWSpeech, swapRs } from './w-speech.js?v=7';
+import { createProfileManager } from './profiles.js?v=7';
+import { createWorkoutController } from './workouts.js?v=7';
 
 enableWSpeech();
 
@@ -485,23 +486,34 @@ function clearWorkoutExerciseContext() {
 }
 
 function prepareWorkoutExercise(context) {
-  const { name, previous } = context;
-  workoutExerciseContext = { name, previous };
+  const {
+    name,
+    previous,
+    plannedSet = {},
+    setNumber,
+    totalSets,
+  } = context;
+  const hasStrengthPlan = plannedSet.weight !== null && plannedSet.weight !== undefined
+    || plannedSet.reps !== null && plannedSet.reps !== undefined;
+  workoutExerciseContext = { ...context };
   form.reset();
   editingId = null;
   exerciseInput.value = name;
-  typeSelect.value = previous?.type && WORKOUT_TYPES[previous.type] ? previous.type : 'strength';
-  $('#weightInput').value = previous?.weight ?? '';
-  $('#repsInput').value = previous?.reps ?? '';
+  typeSelect.value = hasStrengthPlan
+    ? 'strength'
+    : previous?.type && WORKOUT_TYPES[previous.type] ? previous.type : 'strength';
+  $('#weightInput').value = plannedSet.weight ?? previous?.weight ?? '';
+  $('#repsInput').value = plannedSet.reps ?? previous?.reps ?? '';
   $('#durationInput').value = previous?.duration ? previous.duration / 60 : '';
   $('#distanceInput').value = previous?.distance ?? '';
   dateInput.value = toLocalInputValue();
   $('#saveButtonLabel').textContent = 'Save set';
   $('#cancelEditButton').hidden = true;
   $('#lastPerformanceValue').textContent = previous ? formatSet(previous) : 'No previous set yet';
-  $('#lastPerformanceDate').textContent = previous
-    ? `Logged ${longDateFormat.format(new Date(previous.date))}`
-    : 'Your first set can start here.';
+  $('#lastPerformanceDate').textContent = [
+    setNumber ? `Set ${setNumber} of ${totalSets}` : '',
+    previous ? `Last ${longDateFormat.format(new Date(previous.date))}` : '',
+  ].filter(Boolean).join(' · ');
   $('#lastPerformanceCard').hidden = false;
   updateMetricFields();
   showView('log');
@@ -590,20 +602,27 @@ form.addEventListener('submit', (event) => {
   }
 
   const wasEditing = Boolean(editingId);
+  let nextWorkoutContext = null;
   if (wasEditing) {
     records = records.map((record) => record.id === editingId ? candidate : record);
     showToast('Set updated 🐌');
   } else {
     records.push(candidate);
-    workoutController?.recordSaved(candidate);
+    nextWorkoutContext = workoutController?.recordSaved(candidate) ?? null;
     showToast('Set saved 🐌');
   }
 
   persist();
   const workoutContext = workoutExerciseContext;
   resetForm();
-  if (workoutContext && !wasEditing) prepareWorkoutExercise(workoutContext);
   renderAll();
+  if (workoutContext && !wasEditing) {
+    if (nextWorkoutContext) prepareWorkoutExercise(nextWorkoutContext);
+    else {
+      clearWorkoutExerciseContext();
+      showView('workouts');
+    }
+  }
 });
 
 typeSelect.addEventListener('change', updateMetricFields);
@@ -646,14 +665,14 @@ $('#importInput').addEventListener('change', async (event) => {
     const imported = parseBackup(text);
     const importedPresets = workoutController.previewImport(text);
     const presetCopy = importedPresets === null ? '' : ` and ${importedPresets.length} presets`;
-    if (!window.confirm(swapRs(`Replace this browser’s ${records.length} sets with ${imported.length} imported sets${presetCopy}?`))) {
+    if (!window.confirm(swapRs(`Add ${imported.length} sets${presetCopy}? Existing data stays.`))) {
       return;
     }
-    records = imported;
+    records = mergeRecords(records, imported);
     workoutController.importFromBackup(text);
     persist();
     renderAll();
-    showToast('Backup imported.');
+    showToast('Import added.');
   } catch (error) {
     showToast(error.message || 'That backup could not be read.');
   } finally {

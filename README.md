@@ -9,10 +9,10 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - one-set-at-a-time logging for weight and reps, reps only, time, or distance;
 - progress graphs with daily bests, latest result, personal best, and percentage change;
 - workout streaks, today's summary, editable history, and custom exercise names;
-- editable workout presets with three first-visit starter routines and active-workout progress;
+- searchable workout presets with ordered exercises, planned set/weight/rep rows, three starter routines, and set-by-set progress;
 - last-time weight and reps shown and prefilled when an exercise is opened from a workout;
 - local name profiles with a pre-created Petra profile and separate workout spaces;
-- local-only storage for sets, presets, and active workouts with JSON export/import for sets and presets;
+- local-only storage for sets, presets, and active workouts with merge-safe JSON import/export;
 - installable, offline-capable phone experience;
 - light Elmer Fudd-style wordplay on a few signature words such as `wowkout`, `pwogwess`, and `weady`, while ordinary wording and saved workout data keep their real r's;
 - no passwords, analytics, advertising, or remote workout database.
