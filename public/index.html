@@ -8,9 +8,9 @@
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=6">
-    <link rel="stylesheet" href="/styles.css?v=6">
-    <script type="module" src="/app.js?v=6"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=7">
+    <link rel="stylesheet" href="/styles.css?v=7">
+    <script type="module" src="/app.js?v=7"></script>
   </head>
   <body>
     <section class="profile-gate" id="profileGate" aria-labelledby="profileTitle">
@@ -125,11 +125,12 @@
               </label>
               <div class="preset-exercise-builder">
                 <label class="field">
-                  <span>Add exercise</span>
-                  <input id="presetExerciseInput" list="exerciseOptions" maxlength="80" placeholder="e.g. Hip thrust" autocomplete="off">
+                  <span>Search exercise</span>
+                  <input id="presetExerciseInput" maxlength="80" placeholder="e.g. Hip thrust" autocomplete="off" aria-controls="presetExerciseSuggestions">
                 </label>
                 <button class="secondary-button" id="addPresetExerciseButton" type="button">Add</button>
               </div>
+              <div class="exercise-picker" id="presetExerciseSuggestions" aria-label="Exercise suggestions"></div>
               <div class="preset-draft-list" id="presetDraftList"></div>
               <button class="primary-button" type="submit">
                 <img src="/snail.svg" alt=""> Save preset

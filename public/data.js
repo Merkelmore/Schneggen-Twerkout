@@ -80,6 +80,17 @@ export const sortRecords = (records) => [...records].sort(
   (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
 );
 
+export const mergeRecords = (current, incoming) => {
+  const merged = new Map();
+  [...(Array.isArray(current) ? current : []), ...(Array.isArray(incoming) ? incoming : [])]
+    .map(normaliseRecord)
+    .filter(Boolean)
+    .forEach((record) => {
+      if (!merged.has(record.id)) merged.set(record.id, record);
+    });
+  return sortRecords([...merged.values()]);
+};
+
 export const metricValue = (record, metric = 'primary') => {
   const selected = metric === 'primary'
     ? WORKOUT_TYPES[record.type]?.metrics[0]?.value

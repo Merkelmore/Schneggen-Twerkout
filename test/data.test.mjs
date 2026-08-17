@@ -4,6 +4,7 @@ import test from 'node:test';
 import {
   aggregateSeries,
   calculateStreak,
+  mergeRecords,
   metricValue,
   normaliseRecord,
   parseBackup,
@@ -87,6 +88,16 @@ test('backup parser rejects unrelated JSON', () => {
   assert.throws(() => parseBackup('{"hello":"world"}'), /no workout records/i);
 });
 
+test('merge import keeps existing records and skips duplicate ids', () => {
+  const current = [set({ id: 'same', weight: 80 })];
+  const imported = [
+    set({ id: 'same', weight: 90 }),
+    set({ id: 'new', exercise: 'Squat', weight: 60 }),
+  ];
+  const merged = mergeRecords(current, imported);
+  assert.equal(merged.length, 2);
+  assert.equal(merged.find(({ id }) => id === 'same').weight, 80);
+});
 test('repairs an invalid imported creation timestamp', () => {
   const record = set({ createdAt: 'not-a-date' });
   assert.match(record.createdAt, /^\d{4}-\d{2}-\d{2}T/);

@@ -12,7 +12,7 @@
 
 ## Persistence and backup
 
-Profile names, workout data, presets, and active-workout state are browser-local and are never written to the server. Petra is seeded as the initial saved profile. Existing unscoped browser data is copied into Petra's profile and dual-written to the legacy keys for rollback compatibility. JSON export/import backs up the current profile's sets and presets; an in-progress workout and the profile name are intentionally not exported. Production has no application data volume to back up.
+Profile names, workout data, presets, planned sets, and active-workout state are browser-local and are never written to the server. Petra is seeded as the initial saved profile. Existing unscoped browser data is copied into Petra's profile and dual-written to the legacy keys for rollback compatibility. JSON export/import merges the current profile's sets and presets by stable IDs; an in-progress workout and the profile name are intentionally not exported. Production has no application data volume to back up.
 
 ## Release
 
