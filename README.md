@@ -7,7 +7,7 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 ## Features
 
 - one-set-at-a-time logging for weight and reps, reps only, time, or distance;
-- progress graphs with daily bests, latest result, personal best, and percentage change;
+- a central volume dashboard comparing weekly totals and repeated preset workouts, plus exercise-level daily best graphs;
 - workout streaks, today's summary, editable history, and custom exercise names;
 - searchable workout presets with ordered exercises, planned set/weight/rep rows, three starter routines, and set-by-set progress;
 - last-time weight and reps shown and prefilled when an exercise is opened from a workout;

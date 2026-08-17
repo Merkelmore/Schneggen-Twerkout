@@ -1,12 +1,13 @@
 {
   "name": "schneggen-twerkout",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
     "test": "node --test",
-    "import-profile": "node scripts/import-profile.mjs"
+    "import-profile": "node scripts/import-profile.mjs",
+    "tag-workout": "node scripts/tag-workout.mjs"
   },
   "engines": {
     "node": ">=24"

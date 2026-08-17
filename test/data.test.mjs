@@ -8,8 +8,10 @@ import {
   metricValue,
   normaliseRecord,
   parseBackup,
+  presetVolumeSeries,
   serialiseBackup,
   todaySummary,
+  weeklyVolumeSeries,
 } from '../public/data.js';
 
 const set = (overrides = {}) => normaliseRecord({
@@ -101,4 +103,54 @@ test('merge import keeps existing records and skips duplicate ids', () => {
 test('repairs an invalid imported creation timestamp', () => {
   const record = set({ createdAt: 'not-a-date' });
   assert.match(record.createdAt, /^\d{4}-\d{2}-\d{2}T/);
+});
+
+test('weekly volume totals compare all weighted sets by Monday-starting week', () => {
+  const records = [
+    set({ id: 'week-1', date: '2026-08-10T12:00:00Z', weight: 50, reps: 20 }),
+    set({ id: 'week-2', date: '2026-08-17T12:00:00Z', weight: 55, reps: 20 }),
+    set({ id: 'ignored', type: 'reps', date: '2026-08-17T13:00:00Z', weight: null, reps: 10 }),
+  ];
+  assert.deepEqual(weeklyVolumeSeries(records).map(({ day, value }) => ({ day, value })), [
+    { day: '2026-08-10', value: 1000 },
+    { day: '2026-08-17', value: 1100 },
+  ]);
+});
+
+test('preset volume totals compare complete workout sessions, not shared exercises', () => {
+  const session = (id, date, weight) => [1, 2].map((index) => set({
+    id: `${id}-${index}`,
+    date,
+    weight,
+    reps: 5,
+    workoutId: id,
+    presetId: 'leg-day',
+    workoutName: 'Leg day',
+    workoutStartedAt: date,
+  }));
+  const records = [
+    ...session('leg-1', '2026-08-10T12:00:00Z', 40),
+    ...session('leg-2', '2026-08-17T12:00:00Z', 45),
+    set({ id: 'other', workoutId: 'upper-1', presetId: 'upper', weight: 100, reps: 10 }),
+  ];
+  assert.deepEqual(presetVolumeSeries(records, 'leg-day').map(({ value, sets }) => ({ value, sets })), [
+    { value: 400, sets: 2 },
+    { value: 450, sets: 2 },
+  ]);
+});
+
+test('merge keeps local values while accepting remote workout-session metadata', () => {
+  const local = set({ id: 'same', weight: 80 });
+  const remote = set({
+    id: 'same',
+    weight: 90,
+    workoutId: 'legacy-upper-2026-08-17',
+    presetId: 'upper',
+    workoutName: 'Upper Body Day',
+    workoutStartedAt: '2026-08-17T12:00:00Z',
+  });
+  const [merged] = mergeRecords([local], [remote]);
+  assert.equal(merged.weight, 80);
+  assert.equal(merged.workoutId, 'legacy-upper-2026-08-17');
+  assert.equal(merged.presetId, 'upper');
 });

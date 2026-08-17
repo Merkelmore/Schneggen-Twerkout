@@ -11,13 +11,14 @@ import {
   importProfileBackup,
   openProfileDatabase,
   saveProfileState,
+  tagProfileWorkoutDay,
 } from '../server/state.mjs';
 
 const makeRecord = (overrides = {}) => ({
   id: overrides.id || 'set-1',
   exercise: overrides.exercise || 'Hip thrust',
   type: 'strength',
-  date: '2026-08-17T15:00:00.000Z',
+  date: overrides.date || '2026-08-17T15:00:00.000Z',
   weight: overrides.weight ?? 80,
   reps: overrides.reps ?? 8,
   notes: '',
@@ -61,6 +62,35 @@ test('private backup import merges records and presets into Petra', async (conte
   }));
   assert.equal(result.state.records.length, 1);
   assert.ok(result.state.presets.some(({ name }) => name === 'Upper Body Day'));
+});
+
+test('tags one historical day as a preset workout without changing set values', async (context) => {
+  const directory = await mkdtemp(join(tmpdir(), 'schneggen-tag-'));
+  const database = openProfileDatabase(join(directory, 'profiles.sqlite'));
+  context.after(async () => {
+    database.close();
+    await rm(directory, { recursive: true, force: true });
+  });
+  const petra = getOrCreateProfile(database, 'Petra');
+  saveProfileState(database, 'Petra', {
+    ...petra.state,
+    presets: [...petra.state.presets, {
+      id: 'upper-day',
+      name: 'Upper Body Day',
+      exercises: ['Chest Press (Machine)'],
+    }],
+    records: [
+      makeRecord({ id: 'one', weight: 30 }),
+      makeRecord({ id: 'two', weight: 35 }),
+      makeRecord({ id: 'older', date: '2026-08-10T15:00:00.000Z', weight: 25 }),
+    ],
+  });
+
+  const result = tagProfileWorkoutDay(database, 'Petra', 'upper body day', '2026-08-17');
+  assert.equal(result.tagged, 2);
+  assert.equal(result.state.records.find(({ id }) => id === 'one').weight, 30);
+  assert.equal(result.state.records.find(({ id }) => id === 'one').presetId, 'upper-day');
+  assert.equal(result.state.records.find(({ id }) => id === 'older').workoutId, '');
 });
 
 test('HTTP service stores profile state and serves the secured app', async (context) => {

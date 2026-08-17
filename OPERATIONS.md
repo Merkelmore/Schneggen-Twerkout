@@ -12,7 +12,7 @@
 
 ## Persistence and backup
 
-Profile names, workout data, presets, planned sets, and active-workout state are stored in SQLite at `/data/schneggen.sqlite` on the `schneggen_twerkout_data` named volume. The browser keeps an offline cache and merges it into the server on first sync so existing data is preserved. Petra is created automatically; her historical import is added with `npm run import-profile -- Petra <backup-file>` while the database volume is mounted. JSON import remains merge-safe.
+Profile names, workout data, presets, planned sets, and active-workout state are stored in SQLite at `/data/schneggen.sqlite` on the `schneggen_twerkout_data` named volume. Sets logged from an active preset retain their workout and preset IDs for per-workout volume comparisons. The browser keeps an offline cache and merges it into the server on first sync so existing data is preserved. Petra is created automatically; historical imports use `npm run import-profile -- <profile> <backup-file>`, and an imported day can be linked to a preset with `npm run tag-workout -- <profile> <preset> <YYYY-MM-DD>` while the database volume is mounted. JSON import remains merge-safe.
 
 The shared `production-data-backup` job uses SQLite's online backup command, verifies `PRAGMA integrity_check`, compresses the copy, and retains daily backups for 14 days. Restore into a stopped app from a verified backup, keep the damaged database separately, then start the same reviewed revision and verify Petra's set count and public behavior.
 
@@ -21,7 +21,7 @@ The shared `production-data-backup` job uses SQLite's online backup command, ver
 1. Test the exact Git revision with `npm test`, an API/database smoke test, and a container health check.
 2. Build the image with the short Git revision as its immutable tag.
 3. Deploy only the `schneggen-twerkout` Compose project on the shared network.
-4. Verify the container, `/healthz`, the public HTTPS page, Petra's server-side set count, a fresh verified backup, and existing neighboring sites.
+4. Verify the container, `/healthz`, the public HTTPS page, weekly and preset volume graphs, Petra's server-side set count, a fresh verified backup, and existing neighboring sites.
 5. Record the revision and verification in `Merkelmore/production-operations`.
 
 ## Rollback

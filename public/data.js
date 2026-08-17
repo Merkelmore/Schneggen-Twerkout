@@ -44,11 +44,23 @@ export const localDayKey = (input) => {
   return `${year}-${month}-${day}`;
 };
 
+export const localWeekKey = (input) => {
+  const date = input instanceof Date ? new Date(input) : new Date(input);
+  if (Number.isNaN(date.getTime())) return '';
+  const daysSinceMonday = (date.getDay() + 6) % 7;
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() - daysSinceMonday);
+  return localDayKey(date);
+};
+
 export const normaliseRecord = (input = {}) => {
   const exercise = String(input.exercise ?? '').trim().replace(/\s+/g, ' ').slice(0, 80);
   const type = Object.hasOwn(WORKOUT_TYPES, input.type) ? input.type : 'strength';
   const parsedDate = new Date(input.date);
   const parsedCreatedAt = new Date(input.createdAt || Date.now());
+  const parsedWorkoutStartedAt = input.workoutStartedAt
+    ? new Date(input.workoutStartedAt)
+    : null;
   if (!exercise || Number.isNaN(parsedDate.getTime())) return null;
 
   const record = {
@@ -61,6 +73,12 @@ export const normaliseRecord = (input = {}) => {
     duration: cleanNumber(input.duration, { integer: true, min: 1, max: 604_800 }),
     distance: cleanNumber(input.distance, { min: 0.01, max: 100_000 }),
     notes: String(input.notes ?? '').trim().slice(0, 240),
+    workoutId: String(input.workoutId ?? '').trim().slice(0, 80),
+    presetId: String(input.presetId ?? '').trim().slice(0, 80),
+    workoutName: String(input.workoutName ?? '').trim().replace(/\s+/g, ' ').slice(0, 60),
+    workoutStartedAt: parsedWorkoutStartedAt && !Number.isNaN(parsedWorkoutStartedAt.getTime())
+      ? parsedWorkoutStartedAt.toISOString()
+      : null,
     createdAt: Number.isNaN(parsedCreatedAt.getTime())
       ? new Date().toISOString()
       : parsedCreatedAt.toISOString(),
@@ -86,7 +104,19 @@ export const mergeRecords = (current, incoming) => {
     .map(normaliseRecord)
     .filter(Boolean)
     .forEach((record) => {
-      if (!merged.has(record.id)) merged.set(record.id, record);
+      const existing = merged.get(record.id);
+      if (!existing) {
+        merged.set(record.id, record);
+        return;
+      }
+      merged.set(record.id, {
+        ...record,
+        ...existing,
+        workoutId: existing.workoutId || record.workoutId,
+        presetId: existing.presetId || record.presetId,
+        workoutName: existing.workoutName || record.workoutName,
+        workoutStartedAt: existing.workoutStartedAt || record.workoutStartedAt,
+      });
     });
   return sortRecords([...merged.values()]);
 };
@@ -116,6 +146,52 @@ export const aggregateSeries = (records, exercise, metric = 'primary') => {
   }
 
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+};
+
+const roundedVolume = (value) => Math.round(value * 100) / 100;
+
+export const weeklyVolumeSeries = (records) => {
+  const byWeek = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    if (record.type !== 'strength') continue;
+    const value = metricValue(record, 'volume');
+    const day = localWeekKey(record.date);
+    if (!day || !Number.isFinite(value) || value <= 0) continue;
+    const current = byWeek.get(day) || { day, value: 0, sets: 0 };
+    current.value += value;
+    current.sets += 1;
+    byWeek.set(day, current);
+  }
+  return [...byWeek.values()]
+    .map((point) => ({ ...point, value: roundedVolume(point.value) }))
+    .sort((a, b) => a.day.localeCompare(b.day));
+};
+
+export const presetVolumeSeries = (records, presetId) => {
+  const selectedPresetId = String(presetId ?? '').trim();
+  if (!selectedPresetId) return [];
+  const byWorkout = new Map();
+  for (const record of Array.isArray(records) ? records : []) {
+    if (record.type !== 'strength'
+        || record.presetId !== selectedPresetId
+        || !record.workoutId) continue;
+    const value = metricValue(record, 'volume');
+    if (!Number.isFinite(value) || value <= 0) continue;
+    const timestamp = new Date(record.workoutStartedAt || record.date).getTime();
+    const current = byWorkout.get(record.workoutId) || {
+      workoutId: record.workoutId,
+      day: localDayKey(record.workoutStartedAt || record.date),
+      date: Number.isNaN(timestamp) ? new Date(record.date).getTime() : timestamp,
+      value: 0,
+      sets: 0,
+    };
+    current.value += value;
+    current.sets += 1;
+    byWorkout.set(record.workoutId, current);
+  }
+  return [...byWorkout.values()]
+    .map((point) => ({ ...point, value: roundedVolume(point.value) }))
+    .sort((a, b) => a.date - b.date || a.workoutId.localeCompare(b.workoutId));
 };
 
 const daySerial = (key) => {

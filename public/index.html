@@ -8,9 +8,9 @@
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=8">
-    <link rel="stylesheet" href="/styles.css?v=8">
-    <script type="module" src="/app.js?v=8"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=9">
+    <link rel="stylesheet" href="/styles.css?v=9">
+    <script type="module" src="/app.js?v=9"></script>
   </head>
   <body>
     <section class="profile-gate" id="profileGate" aria-labelledby="profileTitle">
@@ -257,7 +257,46 @@
             <h1>Progress</h1>
           </div>
 
+          <section class="panel volume-progress-panel" aria-labelledby="volumeTitle">
+            <div class="panel-heading compact-heading">
+              <h2 id="volumeTitle">Volume</h2>
+            </div>
+            <div class="progress-controls">
+              <label class="field">
+                <span>Compare</span>
+                <select id="volumeMode">
+                  <option value="weekly">Weeks</option>
+                  <option value="preset">Preset workouts</option>
+                </select>
+              </label>
+              <label class="field" id="volumePresetField" hidden>
+                <span>Preset</span>
+                <select id="volumePreset"></select>
+              </label>
+            </div>
+
+            <dl class="progress-stats">
+              <div><dt>Latest</dt><dd id="volumeLatest">&mdash;</dd></div>
+              <div><dt>Best</dt><dd id="volumeBest">&mdash;</dd></div>
+              <div><dt>Change</dt><dd id="volumeChange">&mdash;</dd></div>
+              <div><dt id="volumeCountLabel">Weeks</dt><dd id="volumeCount">0</dd></div>
+            </dl>
+
+            <div class="chart-wrap" id="volumeChartWrap">
+              <svg id="volumeChart" viewBox="0 0 720 300" role="img"></svg>
+              <div class="empty-state" id="volumeChartEmpty">
+                <img src="/snail.svg" alt="">
+                <strong>No volume yet.</strong>
+                <span>Log weighted sets.</span>
+              </div>
+            </div>
+            <div class="volume-timeline" id="volumeTimeline" aria-label="Volume totals"></div>
+          </section>
+
           <section class="panel progress-panel">
+            <div class="panel-heading compact-heading">
+              <h2>Exercise</h2>
+            </div>
             <div class="progress-controls">
               <label class="field">
                 <span>Exercise</span>
