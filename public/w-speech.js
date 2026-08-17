@@ -1,7 +1,31 @@
-const USER_TEXT_ATTRIBUTES = ['aria-label', 'alt', 'placeholder', 'title'];
+const TEXT_ATTRIBUTES = ['aria-label', 'alt', 'placeholder', 'title'];
 
-export const swapRs = (value) => String(value).replace(/[rR]/g, (letter) => (
-  letter === 'R' ? 'W' : 'w'
+const PLAYFUL_WORDS = Object.freeze({
+  crawl: 'cwawl',
+  crawled: 'cwawled',
+  crawling: 'cwawling',
+  crawls: 'cwawls',
+  progress: 'pwogwess',
+  rabbit: 'wabbit',
+  ready: 'weady',
+  strong: 'stwong',
+  very: 'vewy',
+  workout: 'wowkout',
+  workouts: 'wowkouts',
+});
+
+const PLAYFUL_WORD_PATTERN = /\b(crawl|crawled|crawling|crawls|progress|rabbit|ready|strong|very|workout|workouts)\b/gi;
+
+function matchCase(source, replacement) {
+  if (source === source.toUpperCase()) return replacement.toUpperCase();
+  if (source[0] === source[0].toUpperCase()) {
+    return replacement[0].toUpperCase() + replacement.slice(1);
+  }
+  return replacement;
+}
+
+export const swapRs = (value) => String(value).replace(PLAYFUL_WORD_PATTERN, (word) => (
+  matchCase(word, PLAYFUL_WORDS[word.toLowerCase()])
 ));
 
 function transformTextNode(node) {
@@ -10,7 +34,7 @@ function transformTextNode(node) {
 }
 
 function transformAttributes(element) {
-  USER_TEXT_ATTRIBUTES.forEach((name) => {
+  TEXT_ATTRIBUTES.forEach((name) => {
     if (!element.hasAttribute(name)) return;
     const current = element.getAttribute(name);
     const transformed = swapRs(current);
@@ -55,7 +79,7 @@ export function enableWSpeech(root = document) {
 
   observer.observe(scope, {
     attributes: true,
-    attributeFilter: USER_TEXT_ATTRIBUTES,
+    attributeFilter: TEXT_ATTRIBUTES,
     characterData: true,
     childList: true,
     subtree: true,

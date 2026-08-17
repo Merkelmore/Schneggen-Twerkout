@@ -10,8 +10,8 @@ import {
   normalisePresets,
   parsePresetBackup,
   startWorkout,
-} from './presets.js?v=4';
-import { swapRs } from './w-speech.js';
+} from './presets.js?v=5';
+import { swapRs } from './w-speech.js?v=5';
 
 const element = (tag, className, text) => {
   const node = document.createElement(tag);

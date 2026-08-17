@@ -1,18 +1,18 @@
-const CACHE = 'schneggen-twerkout-v4';
+const CACHE = 'schneggen-twerkout-v5';
 const ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=4',
-  '/app.js?v=4',
-  '/data.js?v=4',
-  '/presets.js?v=4',
-  '/workouts.js?v=4',
-  '/profiles.js?v=4',
-  '/w-speech.js',
+  '/styles.css?v=5',
+  '/app.js?v=5',
+  '/data.js?v=5',
+  '/presets.js?v=5',
+  '/workouts.js?v=5',
+  '/profiles.js?v=5',
+  '/w-speech.js?v=5',
   '/snail.svg',
   '/icon-192.png',
   '/icon-512.png',
-  '/manifest.webmanifest?v=4',
+  '/manifest.webmanifest?v=5',
 ];
 
 self.addEventListener('install', (event) => {
