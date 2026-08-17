@@ -9,10 +9,10 @@ import {
   serialiseBackup,
   sortRecords,
   todaySummary,
-} from './data.js?v=4';
-import { enableWSpeech, swapRs } from './w-speech.js';
-import { createProfileManager } from './profiles.js?v=4';
-import { createWorkoutController } from './workouts.js?v=4';
+} from './data.js?v=5';
+import { enableWSpeech, swapRs } from './w-speech.js?v=5';
+import { createProfileManager } from './profiles.js?v=5';
+import { createWorkoutController } from './workouts.js?v=5';
 
 enableWSpeech();
 

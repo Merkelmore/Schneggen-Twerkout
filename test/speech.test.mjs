@@ -3,10 +3,13 @@ import test from 'node:test';
 
 import { swapRs } from '../public/w-speech.js';
 
-test('turns every lowercase and uppercase r into w', () => {
-  assert.equal(swapRs('Rear delt raise - Progress'), 'Weaw delt waise - Pwogwess');
+test('uses w-speech only for a curated set of playful words', () => {
+  assert.equal(
+    swapRs('Ready for a STRONG workout: progress while crawling; very rabbit.'),
+    'Weady for a STWONG wowkout: pwogwess while cwawling; vewy wabbit.',
+  );
 });
 
-test('leaves text without r unchanged', () => {
-  assert.equal(swapRs('slow snail gains'), 'slow snail gains');
+test('keeps ordinary r words, names, and exercises readable', () => {
+  assert.equal(swapRs('Petra records rear delt raise'), 'Petra records rear delt raise');
 });

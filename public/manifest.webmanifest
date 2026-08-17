@@ -1,7 +1,7 @@
 {
-  "name": "Schneggen-Twewkout",
-  "short_name": "Twewkout",
-  "description": "A cute, pwivate wowkout twackew with fwee pwogwess gwaphs.",
+  "name": "Schneggen-Twerkout",
+  "short_name": "Twerkout",
+  "description": "A cute, private workout tracker with free progress graphs.",
   "start_url": "/#log",
   "display": "standalone",
   "background_color": "#fff8ee",

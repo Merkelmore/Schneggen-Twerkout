@@ -14,7 +14,7 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - local name profiles with a pre-created Petra profile and separate workout spaces;
 - local-only storage for sets, presets, and active workouts with JSON export/import for sets and presets;
 - installable, offline-capable phone experience;
-- playful display mode that turns every `r`/`R` into `w`/`W` without changing saved workout data;
+- light Elmer Fudd-style wordplay on a few signature words such as `wowkout`, `pwogwess`, and `weady`, while ordinary wording and saved workout data keep their real r's;
 - no passwords, analytics, advertising, or remote workout database.
 
 ## Local checks
