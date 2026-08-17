@@ -10,7 +10,7 @@ import {
   normalisePresets,
   parsePresetBackup,
   startWorkout,
-} from './presets.js?v=3';
+} from './presets.js?v=4';
 import { swapRs } from './w-speech.js';
 
 const element = (tag, className, text) => {
@@ -25,6 +25,7 @@ export function createWorkoutController({
   onLogExercise,
   onShowView,
   onToast,
+  storage = globalThis.localStorage,
 }) {
   const firstVisitCard = document.querySelector('#firstVisitCard');
   const activePanel = document.querySelector('#activeWorkoutPanel');
@@ -49,7 +50,7 @@ export function createWorkoutController({
 
   function read(key) {
     try {
-      return localStorage.getItem(key);
+      return storage.getItem(key);
     } catch {
       return null;
     }
@@ -57,7 +58,7 @@ export function createWorkoutController({
 
   function store(key, value) {
     try {
-      localStorage.setItem(key, JSON.stringify(value));
+      storage.setItem(key, JSON.stringify(value));
       return true;
     } catch {
       onToast('Storage is full. Export a backup.');
@@ -70,7 +71,7 @@ export function createWorkoutController({
     if (raw === null) {
       const starters = createStarterPresets();
       try {
-        localStorage.setItem(PRESET_STORAGE_KEY, JSON.stringify(starters));
+        storage.setItem(PRESET_STORAGE_KEY, JSON.stringify(starters));
       } catch {
         // The page remains usable even when storage is unavailable.
       }
@@ -104,7 +105,7 @@ export function createWorkoutController({
       return;
     }
     try {
-      localStorage.removeItem(ACTIVE_WORKOUT_STORAGE_KEY);
+      storage.removeItem(ACTIVE_WORKOUT_STORAGE_KEY);
     } catch {
       onToast('Storage is unavailable.');
     }
@@ -114,7 +115,7 @@ export function createWorkoutController({
     firstVisit = false;
     firstVisitCard.hidden = true;
     try {
-      localStorage.setItem(FIRST_VISIT_STORAGE_KEY, 'seen');
+      storage.setItem(FIRST_VISIT_STORAGE_KEY, 'seen');
     } catch {
       // A repeated welcome is harmless when storage is unavailable.
     }

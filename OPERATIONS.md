@@ -11,7 +11,7 @@
 
 ## Persistence and backup
 
-Workout data, presets, and active-workout state are browser-local and are never written to the server. JSON export/import backs up sets and presets; an in-progress workout is intentionally device-session state and is not exported. Production has no application data volume to back up.
+Profile names, workout data, presets, and active-workout state are browser-local and are never written to the server. Petra is seeded as the initial saved profile. Existing unscoped browser data is copied into Petra's profile and dual-written to the legacy keys for rollback compatibility. JSON export/import backs up the current profile's sets and presets; an in-progress workout and the profile name are intentionally not exported. Production has no application data volume to back up.
 
 ## Release
 
@@ -27,5 +27,5 @@ Retain the preceding image and release directory. Set `APP_REVISION` to the prec
 
 ## Owner actions
 
-None. The app requires no secret, paid service, account, or database.
+None. The local name gate is not secure authentication and requires no secret, paid service, remote account, or database. Add a managed authentication and data service only if cross-device sync or recovery becomes a requirement.
 

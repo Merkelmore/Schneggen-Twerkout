@@ -9,10 +9,13 @@ test('ships the full workout tracker interface', async () => {
   assert.match(html, /Schneggen-/);
   assert.match(html, /Progress, unlocked\./);
   assert.match(html, /id="setForm"/);
-  assert.match(html, /src="\/app\.js\?v=3"/);
+  assert.match(html, /src="\/app\.js\?v=4"/);
   assert.match(html, /id="workoutsView"/);
   assert.match(html, /id="presetForm"/);
   assert.match(html, /id="lastPerformanceCard"/);
+  assert.match(html, /id="profileGate"/);
+  assert.match(html, /id="profileNameInput"/);
+  assert.match(html, /id="profileButton"/);
   assert.doesNotMatch(html, /available soon/i);
 });
 
@@ -22,9 +25,10 @@ test('keeps health and install assets stable', async () => {
   assert.equal(manifest.name, 'Schneggen-Twewkout');
   assert.equal(manifest.display, 'standalone');
   assert.doesNotMatch(`${manifest.name}${manifest.short_name}${manifest.description}`, /r/i);
-  assert.match(await read('public/sw.js'), /schneggen-twerkout-v3/);
-  assert.match(await read('public/sw.js'), /presets\.js\?v=3/);
-  assert.match(await read('public/sw.js'), /workouts\.js\?v=3/);
+  assert.match(await read('public/sw.js'), /schneggen-twerkout-v4/);
+  assert.match(await read('public/sw.js'), /presets\.js\?v=4/);
+  assert.match(await read('public/sw.js'), /workouts\.js\?v=4/);
+  assert.match(await read('public/sw.js'), /profiles\.js\?v=4/);
   assert.match(await read('public/sw.js'), /w-speech\.js/);
 });
 
@@ -34,6 +38,7 @@ test('uses no remote scripts, analytics, or fonts', async () => {
     read('public/app.js'),
     read('public/workouts.js'),
     read('public/presets.js'),
+    read('public/profiles.js'),
     read('public/w-speech.js'),
   ]);
   assert.doesNotMatch(html, /(?:src|href)="https?:\/\//);
