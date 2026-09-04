@@ -1,5 +1,5 @@
 export const STORAGE_KEY = 'schneggen-workouts-v1';
-export const BACKUP_VERSION = 2;
+export const BACKUP_VERSION = 3;
 
 export const WORKOUT_TYPES = {
   strength: {
@@ -231,12 +231,13 @@ export const todaySummary = (records, now = new Date()) => {
   };
 };
 
-export const serialiseBackup = (records, { presets = [] } = {}) => JSON.stringify({
+export const serialiseBackup = (records, { presets = [], workoutPlan = null } = {}) => JSON.stringify({
   app: 'Schneggen-Twerkout',
   version: BACKUP_VERSION,
   exportedAt: new Date().toISOString(),
   records: sortRecords(records),
   presets,
+  workoutPlan,
 }, null, 2);
 
 export const parseBackup = (text) => {

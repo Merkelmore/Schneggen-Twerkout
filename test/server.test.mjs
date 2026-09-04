@@ -41,9 +41,15 @@ test('SQLite profiles are unique by name and persist normalised state', async (c
   const saved = saveProfileState(database, 'Petra', {
     records: [makeRecord()],
     presets: petra.state.presets,
+    workoutPlan: {
+      mode: 'rotation',
+      rotation: ['starter-lower-body', 'starter-upper-body'],
+      updatedAt: '2026-09-04T08:00:00.000Z',
+    },
     firstVisitSeen: true,
   });
   assert.equal(saved.state.records.length, 1);
+  assert.deepEqual(saved.state.workoutPlan.rotation, ['starter-lower-body', 'starter-upper-body']);
   assert.equal(saved.state.firstVisitSeen, true);
   assert.ok(saved.revision > petra.revision);
 });

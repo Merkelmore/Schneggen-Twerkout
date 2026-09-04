@@ -1,12 +1,17 @@
-import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=9';
+import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=10';
 import {
   ACTIVE_WORKOUT_STORAGE_KEY,
   FIRST_VISIT_STORAGE_KEY,
   PRESET_STORAGE_KEY,
   normaliseActiveWorkout,
   normalisePresets,
-} from './presets.js?v=9';
-import { normaliseProfileName } from './profiles.js?v=9';
+} from './presets.js?v=10';
+import {
+  WORKOUT_PLAN_STORAGE_KEY,
+  mergeWorkoutPlans,
+  normaliseWorkoutPlan,
+} from './plans.js?v=10';
+import { normaliseProfileName } from './profiles.js?v=10';
 
 const SYNC_META_PREFIX = 'schneggen-server-sync-v1:';
 
@@ -60,6 +65,7 @@ export const normaliseSyncState = (input = {}) => {
       .map(normaliseRecord)
       .filter(Boolean)),
     presets: normalisePresets(value.presets),
+    workoutPlan: normaliseWorkoutPlan(value.workoutPlan),
     activeWorkout: normaliseActiveWorkout(value.activeWorkout),
     firstVisitSeen: value.firstVisitSeen === true,
   };
@@ -68,6 +74,7 @@ export const normaliseSyncState = (input = {}) => {
 export const readProfileState = (storage) => normaliseSyncState({
   records: parse(safeGet(storage, STORAGE_KEY), []),
   presets: parse(safeGet(storage, PRESET_STORAGE_KEY), []),
+  workoutPlan: parse(safeGet(storage, WORKOUT_PLAN_STORAGE_KEY), null),
   activeWorkout: parse(safeGet(storage, ACTIVE_WORKOUT_STORAGE_KEY), null),
   firstVisitSeen: safeGet(storage, FIRST_VISIT_STORAGE_KEY) === 'seen',
 });
@@ -76,6 +83,7 @@ export const writeProfileState = (storage, input) => {
   const state = normaliseSyncState(input);
   safeSet(storage, STORAGE_KEY, JSON.stringify(state.records));
   safeSet(storage, PRESET_STORAGE_KEY, JSON.stringify(state.presets));
+  safeSet(storage, WORKOUT_PLAN_STORAGE_KEY, JSON.stringify(state.workoutPlan));
   if (state.activeWorkout) {
     safeSet(storage, ACTIVE_WORKOUT_STORAGE_KEY, JSON.stringify(state.activeWorkout));
   } else {
@@ -92,6 +100,7 @@ export const mergeProfileStates = (localInput, remoteInput) => {
   return {
     records: mergeRecords(local.records, remote.records),
     presets: mergePresets(local.presets, remote.presets),
+    workoutPlan: mergeWorkoutPlans(local.workoutPlan, remote.workoutPlan),
     activeWorkout: local.activeWorkout || remote.activeWorkout,
     firstVisitSeen: local.firstVisitSeen || remote.firstVisitSeen,
   };

@@ -42,10 +42,29 @@ test('first server sync merges remote history without replacing local data', () 
 
 test('profile state round-trips through browser storage', () => {
   const storage = memoryStorage();
-  writeProfileState(storage, { records: [record('one', 60)], presets: [], firstVisitSeen: true });
+  writeProfileState(storage, {
+    records: [record('one', 60)],
+    presets: [],
+    workoutPlan: {
+      mode: 'rotation',
+      rotation: ['upper', 'legs'],
+      updatedAt: '2026-09-04T08:00:00.000Z',
+    },
+    firstVisitSeen: true,
+  });
   const state = readProfileState(storage);
   assert.equal(state.records[0].id, 'one');
+  assert.deepEqual(state.workoutPlan.rotation, ['upper', 'legs']);
   assert.equal(state.firstVisitSeen, true);
+});
+
+test('profile merge keeps the newest workout plan', () => {
+  const merged = mergeProfileStates(
+    { workoutPlan: { weekdays: { 1: 'upper' }, updatedAt: '2026-09-01T08:00:00.000Z' } },
+    { workoutPlan: { mode: 'rotation', rotation: ['legs'], updatedAt: '2026-09-04T08:00:00.000Z' } },
+  );
+  assert.equal(merged.workoutPlan.mode, 'rotation');
+  assert.deepEqual(merged.workoutPlan.rotation, ['legs']);
 });
 
 test('synced storage hydrates once and pushes later writes', async () => {

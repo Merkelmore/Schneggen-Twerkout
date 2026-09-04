@@ -8,9 +8,9 @@
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=9">
-    <link rel="stylesheet" href="/styles.css?v=9">
-    <script type="module" src="/app.js?v=9"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=10">
+    <link rel="stylesheet" href="/styles.css?v=10">
+    <script type="module" src="/app.js?v=10"></script>
   </head>
   <body>
     <section class="profile-gate" id="profileGate" aria-labelledby="profileTitle">
@@ -87,6 +87,18 @@
             <img src="/snail.svg" alt="">
           </section>
 
+          <section class="suggested-workout-card" id="suggestedWorkoutCard" hidden>
+            <img src="/snail.svg" alt="" class="suggested-snail">
+            <div class="suggested-workout-copy">
+              <p class="eyebrow" id="suggestedWorkoutLabel">Today</p>
+              <h2 id="suggestedWorkoutName">Workout</h2>
+              <p id="suggestedWorkoutMeta"></p>
+            </div>
+            <button class="suggested-start-button" id="startSuggestedWorkoutButton" type="button">
+              Start workout
+            </button>
+          </section>
+
           <section class="panel active-workout-panel" id="activeWorkoutPanel" hidden>
             <div class="panel-heading active-workout-heading">
               <div>
@@ -101,6 +113,30 @@
             </div>
             <div class="active-exercise-list" id="activeExerciseList"></div>
           </section>
+
+          <details class="panel workout-plan-panel" id="workoutPlanPanel">
+            <summary>
+              <span>
+                <strong>Workout plan</strong>
+                <small>Days or rotation</small>
+              </span>
+              <span aria-hidden="true">&rsaquo;</span>
+            </summary>
+            <form id="workoutPlanForm" class="workout-plan-form">
+              <label class="field plan-mode-field">
+                <span>Suggest</span>
+                <select id="workoutPlanMode">
+                  <option value="weekday">By weekday</option>
+                  <option value="rotation">In order</option>
+                </select>
+              </label>
+              <div class="plan-fields" id="weekdayPlanFields"></div>
+              <div class="plan-fields" id="rotationPlanFields" hidden>
+                <div class="plan-rotation-list" id="rotationPlanList"></div>
+              </div>
+              <button class="secondary-button plan-save-button" type="submit">Save plan</button>
+            </form>
+          </details>
 
           <section class="panel preset-library">
             <div class="panel-heading">

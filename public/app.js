@@ -12,11 +12,11 @@ import {
   sortRecords,
   todaySummary,
   weeklyVolumeSeries,
-} from './data.js?v=9';
-import { enableWSpeech, swapRs } from './w-speech.js?v=9';
-import { createProfileManager } from './profiles.js?v=9';
-import { prepareProfileStorage } from './sync.js?v=9';
-import { createWorkoutController } from './workouts.js?v=9';
+} from './data.js?v=10';
+import { enableWSpeech, swapRs } from './w-speech.js?v=10';
+import { createProfileManager } from './profiles.js?v=10';
+import { prepareProfileStorage } from './sync.js?v=10';
+import { createWorkoutController } from './workouts.js?v=10';
 
 enableWSpeech();
 
@@ -764,7 +764,10 @@ $$('.tab').forEach((tab) => {
 });
 
 $('#exportButton').addEventListener('click', () => {
-  const blob = new Blob([serialiseBackup(records, { presets: workoutController.getPresets() })], { type: 'application/json' });
+  const blob = new Blob([serialiseBackup(records, {
+    presets: workoutController.getPresets(),
+    workoutPlan: workoutController.getWorkoutPlan(),
+  })], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -837,9 +840,12 @@ renderAll();
 
 const requestedView = location.hash.slice(1);
 const availableViews = ['workouts', 'log', 'progress', 'history'];
+const workoutNeedsAttention = workoutController.shouldShowFirstVisit()
+  || workoutController.hasActiveWorkout()
+  || workoutController.hasSuggestedWorkout();
 const initialView = availableViews.includes(requestedView)
   ? requestedView
-  : workoutController.shouldShowFirstVisit() ? 'workouts' : 'log';
+  : workoutNeedsAttention ? 'workouts' : 'log';
 showView(initialView);
 
 if ('serviceWorker' in navigator) {
