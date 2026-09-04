@@ -13,8 +13,17 @@ import {
   normalisePresets,
   parsePresetBackup,
   startWorkout,
-} from './presets.js?v=9';
-import { swapRs } from './w-speech.js?v=9';
+} from './presets.js?v=10';
+import {
+  WEEKDAYS,
+  WORKOUT_PLAN_STORAGE_KEY,
+  mergeWorkoutPlans,
+  normaliseWorkoutPlan,
+  parseWorkoutPlanBackup,
+  reconcileWorkoutPlan,
+  suggestWorkoutPreset,
+} from './plans.js?v=10';
+import { swapRs } from './w-speech.js?v=10';
 
 const EXERCISE_LIBRARY = [
   'Around the World',
@@ -59,6 +68,17 @@ export function createWorkoutController({
   const activeMeta = document.querySelector('#activeWorkoutMeta');
   const activeProgress = document.querySelector('#activeWorkoutProgress');
   const activeList = document.querySelector('#activeExerciseList');
+  const suggestedCard = document.querySelector('#suggestedWorkoutCard');
+  const suggestedLabel = document.querySelector('#suggestedWorkoutLabel');
+  const suggestedName = document.querySelector('#suggestedWorkoutName');
+  const suggestedMeta = document.querySelector('#suggestedWorkoutMeta');
+  const startSuggestedButton = document.querySelector('#startSuggestedWorkoutButton');
+  const workoutPlanPanel = document.querySelector('#workoutPlanPanel');
+  const workoutPlanForm = document.querySelector('#workoutPlanForm');
+  const workoutPlanMode = document.querySelector('#workoutPlanMode');
+  const weekdayPlanFields = document.querySelector('#weekdayPlanFields');
+  const rotationPlanFields = document.querySelector('#rotationPlanFields');
+  const rotationPlanList = document.querySelector('#rotationPlanList');
   const presetList = document.querySelector('#presetList');
   const presetEditor = document.querySelector('#presetEditor');
   const presetEditorTitle = document.querySelector('#presetEditorTitle');
@@ -69,8 +89,11 @@ export function createWorkoutController({
   const presetDraftList = document.querySelector('#presetDraftList');
 
   let records = [];
-  let active = loadActive();
   let presets = loadPresets();
+  let active = loadActive();
+  let workoutPlan = loadWorkoutPlan();
+  let planDraft = normaliseWorkoutPlan(workoutPlan);
+  let rotationOrder = orderedPresetIds(planDraft);
   let draftExercises = [];
   let editingPresetId = null;
   let firstVisit = read(FIRST_VISIT_STORAGE_KEY) !== 'seen';
@@ -122,6 +145,16 @@ export function createWorkoutController({
     }
   }
 
+  function loadWorkoutPlan() {
+    try {
+      return reconcileWorkoutPlan(JSON.parse(
+        read(WORKOUT_PLAN_STORAGE_KEY) || 'null',
+      ), presets);
+    } catch {
+      return normaliseWorkoutPlan();
+    }
+  }
+
   function savePresets() {
     store(PRESET_STORAGE_KEY, presets);
   }
@@ -138,6 +171,23 @@ export function createWorkoutController({
     }
   }
 
+  function saveWorkoutPlan() {
+    store(WORKOUT_PLAN_STORAGE_KEY, workoutPlan);
+  }
+
+  function orderedPresetIds(plan = planDraft) {
+    const available = new Set(presets.map(({ id }) => id));
+    return [
+      ...plan.rotation.filter((presetId) => available.has(presetId)),
+      ...presets.map(({ id }) => id).filter((presetId) => !plan.rotation.includes(presetId)),
+    ];
+  }
+
+  function resetPlanDraft() {
+    planDraft = reconcileWorkoutPlan(workoutPlan, presets);
+    rotationOrder = orderedPresetIds(planDraft);
+  }
+
   function markWelcomeSeen() {
     firstVisit = false;
     firstVisitCard.hidden = true;
@@ -146,6 +196,126 @@ export function createWorkoutController({
     } catch {
       // A repeated welcome is harmless when storage is unavailable.
     }
+  }
+
+  function currentSuggestion() {
+    if (active) return null;
+    return suggestWorkoutPreset({ presets, plan: workoutPlan, records });
+  }
+
+  function renderSuggestedWorkout() {
+    const suggestion = currentSuggestion();
+    suggestedCard.hidden = !suggestion;
+    if (!suggestion) return;
+    suggestedLabel.textContent = suggestion.label;
+    suggestedName.textContent = suggestion.preset.name;
+    suggestedMeta.textContent = `${suggestion.preset.exercises.length} exercises`;
+  }
+
+  function presetSelect(selectedId = '') {
+    const select = document.createElement('select');
+    const empty = document.createElement('option');
+    empty.value = '';
+    empty.textContent = 'Rest';
+    select.append(empty);
+    presets.forEach((preset) => {
+      const option = document.createElement('option');
+      option.value = preset.id;
+      option.textContent = preset.name;
+      select.append(option);
+    });
+    select.value = selectedId;
+    return select;
+  }
+
+  function renderWeekdayPlan() {
+    weekdayPlanFields.replaceChildren();
+    WEEKDAYS.forEach(({ value: day, label }) => {
+      const row = element('label', 'plan-day-row');
+      row.append(element('span', null, label));
+      const select = presetSelect(planDraft.weekdays[day]);
+      select.dataset.day = String(day);
+      select.setAttribute('aria-label', `${label} workout`);
+      select.addEventListener('change', () => {
+        const weekdays = { ...planDraft.weekdays };
+        if (select.value) weekdays[day] = select.value;
+        else delete weekdays[day];
+        planDraft = { ...planDraft, weekdays };
+      });
+      row.append(select);
+      weekdayPlanFields.append(row);
+    });
+  }
+
+  function movePlanPreset(index, offset) {
+    const next = index + offset;
+    if (next < 0 || next >= rotationOrder.length) return;
+    [rotationOrder[index], rotationOrder[next]] = [rotationOrder[next], rotationOrder[index]];
+    const selected = new Set(planDraft.rotation);
+    planDraft = { ...planDraft, rotation: rotationOrder.filter((id) => selected.has(id)) };
+    renderWorkoutPlan();
+  }
+
+  function renderRotationPlan() {
+    rotationPlanList.replaceChildren();
+    if (!presets.length) {
+      rotationPlanList.append(element('p', 'draft-empty', 'Create a preset first.'));
+      return;
+    }
+    rotationOrder.forEach((presetId, index) => {
+      const preset = presets.find(({ id }) => id === presetId);
+      if (!preset) return;
+      const row = element('div', 'plan-rotation-row');
+      const choice = element('label', 'plan-rotation-choice');
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = planDraft.rotation.includes(presetId);
+      checkbox.setAttribute('aria-label', `Include ${preset.name}`);
+      checkbox.addEventListener('change', () => {
+        const selected = new Set(planDraft.rotation);
+        if (checkbox.checked) selected.add(presetId);
+        else selected.delete(presetId);
+        planDraft = { ...planDraft, rotation: rotationOrder.filter((id) => selected.has(id)) };
+      });
+      choice.append(checkbox, element('strong', null, preset.name));
+
+      const actions = element('div', 'plan-rotation-actions');
+      const up = element('button', 'mini-button', '\u2191');
+      up.type = 'button';
+      up.disabled = index === 0;
+      up.setAttribute('aria-label', `Move ${preset.name} up`);
+      up.addEventListener('click', () => movePlanPreset(index, -1));
+      const down = element('button', 'mini-button', '\u2193');
+      down.type = 'button';
+      down.disabled = index === rotationOrder.length - 1;
+      down.setAttribute('aria-label', `Move ${preset.name} down`);
+      down.addEventListener('click', () => movePlanPreset(index, 1));
+      actions.append(up, down);
+      row.append(choice, actions);
+      rotationPlanList.append(row);
+    });
+  }
+
+  function renderWorkoutPlan() {
+    workoutPlanMode.value = planDraft.mode;
+    const rotation = planDraft.mode === 'rotation';
+    weekdayPlanFields.hidden = rotation;
+    rotationPlanFields.hidden = !rotation;
+    renderWeekdayPlan();
+    renderRotationPlan();
+  }
+
+  function savePlan(event) {
+    event.preventDefault();
+    workoutPlan = reconcileWorkoutPlan({
+      ...planDraft,
+      updatedAt: new Date().toISOString(),
+    }, presets);
+    saveWorkoutPlan();
+    resetPlanDraft();
+    render();
+    workoutPlanPanel.open = false;
+    onToast('Workout plan saved.');
   }
 
   function makePresetCard(preset) {
@@ -406,6 +576,8 @@ export function createWorkoutController({
   function render(nextRecords = records) {
     records = Array.isArray(nextRecords) ? nextRecords : [];
     firstVisitCard.hidden = !firstVisit;
+    renderSuggestedWorkout();
+    renderWorkoutPlan();
     renderPresets();
     renderActive();
     if (!presetEditor.hidden) {
@@ -486,6 +658,12 @@ export function createWorkoutController({
     if (!window.confirm(swapRs(`Delete the ${preset.name} preset?`))) return;
     presets = presets.filter((item) => item.id !== preset.id);
     savePresets();
+    const reconciled = reconcileWorkoutPlan(workoutPlan, presets);
+    if (JSON.stringify(reconciled) !== JSON.stringify(workoutPlan)) {
+      workoutPlan = { ...reconciled, updatedAt: new Date().toISOString() };
+      saveWorkoutPlan();
+    }
+    resetPlanDraft();
     render();
     onToast('Preset removed.');
   }
@@ -537,6 +715,15 @@ export function createWorkoutController({
       )),
     ];
     savePresets();
+    const importedPlan = parseWorkoutPlanBackup(text);
+    if (importedPlan) {
+      workoutPlan = reconcileWorkoutPlan(
+        mergeWorkoutPlans(workoutPlan, importedPlan),
+        presets,
+      );
+      saveWorkoutPlan();
+    }
+    resetPlanDraft();
     closeEditor();
     render();
     return true;
@@ -547,6 +734,19 @@ export function createWorkoutController({
   document.querySelector('#addPresetExerciseButton').addEventListener('click', () => addDraftExercise());
   document.querySelector('#finishWorkoutButton').addEventListener('click', finishWorkout);
   document.querySelector('#dismissFirstVisitButton').addEventListener('click', markWelcomeSeen);
+  startSuggestedButton.addEventListener('click', () => {
+    const suggestion = currentSuggestion();
+    if (suggestion) startPreset(suggestion.preset);
+  });
+  workoutPlanMode.addEventListener('change', () => {
+    const mode = workoutPlanMode.value === 'rotation' ? 'rotation' : 'weekday';
+    if (mode === 'rotation' && planDraft.rotation.length === 0) {
+      planDraft = { ...planDraft, rotation: [...rotationOrder] };
+    }
+    planDraft = { ...planDraft, mode };
+    renderWorkoutPlan();
+  });
+  workoutPlanForm.addEventListener('submit', savePlan);
   presetExerciseInput.addEventListener('input', renderSuggestions);
   presetExerciseInput.addEventListener('focus', renderSuggestions);
   presetExerciseInput.addEventListener('keydown', (event) => {
@@ -561,6 +761,9 @@ export function createWorkoutController({
       ...preset,
       exercises: preset.exercises.map(cloneExercise),
     })),
+    getWorkoutPlan: () => normaliseWorkoutPlan(workoutPlan),
+    hasActiveWorkout: () => Boolean(active),
+    hasSuggestedWorkout: () => Boolean(currentSuggestion()),
     importFromBackup,
     previewImport,
     recordSaved,

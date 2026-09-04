@@ -10,6 +10,7 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - a central volume dashboard comparing weekly totals and repeated preset workouts, plus exercise-level daily best graphs;
 - workout streaks, today's summary, editable history, and custom exercise names;
 - searchable workout presets with ordered exercises, planned set/weight/rep rows, three starter routines, and set-by-set progress;
+- per-profile workout plans using weekday assignments or a repeating preset order, with a suggested one-tap start card;
 - last-time weight and reps shown and prefilled when an exercise is opened from a workout;
 - server-backed name profiles with a pre-created Petra profile and separate workout spaces;
 - SQLite storage with a browser-local offline cache and merge-safe JSON import/export;

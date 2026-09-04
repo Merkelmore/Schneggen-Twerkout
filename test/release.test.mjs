@@ -13,9 +13,14 @@ test('ships the full workout tracker interface', async () => {
   assert.match(html, /id="volumeChart"/);
   assert.match(html, /id="volumeTimeline"/);
   assert.match(html, /id="setForm"/);
-  assert.match(html, /src="\/app\.js\?v=9"/);
+  assert.match(html, /src="\/app\.js\?v=10"/);
   assert.match(html, /id="workoutsView"/);
   assert.match(html, /id="presetForm"/);
+  assert.match(html, /id="suggestedWorkoutCard"/);
+  assert.match(html, /id="startSuggestedWorkoutButton"/);
+  assert.match(html, /id="workoutPlanMode"/);
+  assert.match(html, /id="weekdayPlanFields"/);
+  assert.match(html, /id="rotationPlanList"/);
   assert.match(html, /id="lastPerformanceCard"/);
   assert.match(html, /id="profileGate"/);
   assert.match(html, /id="profileNameInput"/);
@@ -35,12 +40,13 @@ test('keeps health and install assets stable', async () => {
   assert.equal(manifest.short_name, 'Twerkout');
   assert.equal(manifest.display, 'standalone');
   assert.match(manifest.description, /workout tracking with presets and progress graphs/i);
-  assert.match(await read('public/sw.js'), /schneggen-twerkout-v9/);
-  assert.match(await read('public/sw.js'), /presets\.js\?v=9/);
-  assert.match(await read('public/sw.js'), /workouts\.js\?v=9/);
-  assert.match(await read('public/sw.js'), /profiles\.js\?v=9/);
-  assert.match(await read('public/sw.js'), /sync\.js\?v=9/);
-  assert.match(await read('public/sw.js'), /w-speech\.js\?v=9/);
+  assert.match(await read('public/sw.js'), /schneggen-twerkout-v10/);
+  assert.match(await read('public/sw.js'), /presets\.js\?v=10/);
+  assert.match(await read('public/sw.js'), /plans\.js\?v=10/);
+  assert.match(await read('public/sw.js'), /workouts\.js\?v=10/);
+  assert.match(await read('public/sw.js'), /profiles\.js\?v=10/);
+  assert.match(await read('public/sw.js'), /sync\.js\?v=10/);
+  assert.match(await read('public/sw.js'), /w-speech\.js\?v=10/);
   assert.match(await read('public/app.js'), /document\.readyState === 'complete'/);
 });
 

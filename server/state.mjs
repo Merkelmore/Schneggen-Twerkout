@@ -7,6 +7,11 @@ import {
   normalisePresets,
   parsePresetBackup,
 } from '../public/presets.js';
+import {
+  mergeWorkoutPlans,
+  normaliseWorkoutPlan,
+  parseWorkoutPlanBackup,
+} from '../public/plans.js';
 import { normaliseProfileName } from '../public/profiles.js';
 
 const MAX_RECORDS = 50_000;
@@ -17,6 +22,7 @@ const profileKey = (name) => normaliseProfileName(name).toLocaleLowerCase();
 export const initialProfileState = () => ({
   records: [],
   presets: createStarterPresets(),
+  workoutPlan: normaliseWorkoutPlan(),
   activeWorkout: null,
   firstVisitSeen: false,
 });
@@ -34,6 +40,7 @@ export const normaliseServerState = (input = {}) => {
   return {
     records,
     presets,
+    workoutPlan: normaliseWorkoutPlan(value.workoutPlan),
     activeWorkout: normaliseActiveWorkout(value.activeWorkout),
     firstVisitSeen: value.firstVisitSeen === true,
   };
@@ -115,10 +122,14 @@ export function importProfileBackup(database, rawName, text) {
   const current = getOrCreateProfile(database, rawName);
   const importedRecords = parseBackup(text);
   const importedPresets = parsePresetBackup(text) ?? [];
+  const importedPlan = parseWorkoutPlanBackup(text);
   return saveProfileState(database, rawName, {
     ...current.state,
     records: mergeRecords(current.state.records, importedRecords),
     presets: mergePresets(current.state.presets, importedPresets),
+    workoutPlan: importedPlan
+      ? mergeWorkoutPlans(current.state.workoutPlan, importedPlan)
+      : current.state.workoutPlan,
   });
 }
 

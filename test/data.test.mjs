@@ -75,15 +75,17 @@ test('today summary counts sets, exercises, and strength volume', () => {
   });
 });
 
-test('backup export and import round-trip records and presets', () => {
+test('backup export and import round-trip records, presets, and workout plan', () => {
   const original = [set({ id: 'backup-set', notes: 'steady' })];
   const presets = [{ id: 'lower', name: 'Lower body', exercises: ['Squat'] }];
-  const backup = serialiseBackup(original, { presets });
+  const workoutPlan = { mode: 'weekday', weekdays: { 1: 'lower' } };
+  const backup = serialiseBackup(original, { presets, workoutPlan });
   const restored = parseBackup(backup);
   assert.equal(restored.length, 1);
   assert.equal(restored[0].id, 'backup-set');
   assert.equal(restored[0].notes, 'steady');
   assert.deepEqual(JSON.parse(backup).presets, presets);
+  assert.deepEqual(JSON.parse(backup).workoutPlan, workoutPlan);
 });
 
 test('backup parser rejects unrelated JSON', () => {
