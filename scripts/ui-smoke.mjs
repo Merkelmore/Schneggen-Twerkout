@@ -1,4 +1,4 @@
-// Run against a disposable local database. No production profiles are touched.
+// Disposable local database only. Never run test writes against a production profile.
 import assert from 'node:assert/strict';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createApplicationServer } from '../server/http.mjs';
 
-if (!process.env.SCHNEGGEN_PLAYWRIGHT_MODULE) throw new Error('Set SCHNEGGEN_PLAYWRIGHT_MODULE to your Playwright module.');
+if (!process.env.SCHNEGGEN_PLAYWRIGHT_MODULE) throw new Error('Set SCHNEGGEN_PLAYWRIGHT_MODULE.');
 const { chromium } = await import(pathToFileURL(process.env.SCHNEGGEN_PLAYWRIGHT_MODULE).href);
 const dir = await mkdtemp(join(tmpdir(), 'schneggen-ui-'));
 const app = createApplicationServer({ databasePath: join(dir, 'test.sqlite'), publicDirectory: fileURLToPath(new URL('../public', import.meta.url)) });
@@ -14,28 +14,20 @@ await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
 const base = `http://127.0.0.1:${app.server.address().port}`;
 const browser = await chromium.launch({ headless: true, executablePath: process.env.SCHNEGGEN_BROWSER_PATH });
 const failures = [];
+let page;
 try {
   const context = await browser.newContext({ viewport: { width: 1100, height: 1100 }, reducedMotion: 'reduce' });
-  const page = await context.newPage();
+  page = await context.newPage();
   page.on('pageerror', (error) => failures.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') failures.push(message.text()); });
   page.on('dialog', (dialog) => dialog.accept());
   const state = async () => (await (await fetch(`${base}/api/profiles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'UAT Tester' }) })).json()).state;
-  const waitSaved = async () => { await page.waitForFunction(() => document.querySelector('#syncStatus').hidden); };
-  await page.goto(base);
-  await page.locator('#profileNameInput').fill('UAT Tester');
-  await page.locator('#profileForm button').click();
-  await page.locator('#newPresetButton').click();
-  await page.locator('#presetNameInput').fill('Leg day UAT');
-  for (const name of ['Squat', 'Leg curl']) {
-    await page.locator('#presetExerciseInput').fill(name);
-    await page.locator('#addPresetExerciseButton').click();
-  }
-  await page.locator('.draft-exercise-name').first().fill('Smith squat');
-  for (const row of await page.locator('.planned-set-row').all()) {
-    await row.locator('input').nth(0).fill('20');
-    await row.locator('input').nth(1).fill('8');
-  }
+  const waitSaved = async (target = page) => { await target.waitForFunction(() => document.querySelector('#syncStatus').hidden); };
+  const openExercise = async (name, target = page) => {
+    const card = target.locator('.session-exercise').filter({ has: target.locator('.workout-exercise-copy strong', { hasText: name }) });
+    if (await card.locator('.workout-exercise-row').getAttribute('aria-expanded') !== 'true') await card.locator('.workout-exercise-row').click();
+    return card;
+  };
   const drag = async (list, from, to) => {
     const source = page.locator(`${list} > [data-reorder-row]`).nth(from).locator('.drag-handle');
     await source.scrollIntoViewIfNeeded();
@@ -47,31 +39,100 @@ try {
     await page.waitForFunction(() => document.querySelector('.drop-target'));
     await page.mouse.up();
   };
+  await page.goto(base);
+  await page.locator('#profileNameInput').fill('UAT Tester');
+  await page.locator('#profileForm button').click();
+  assert.deepEqual(await page.locator('.tab').allTextContents().then((labels) => labels.map((label) => label.trim().replace(/^[^a-z]+/i, ''))), ['Presets', 'Training', 'Progress', 'History', 'Feedback']);
+  await page.locator('#newPresetButton').click();
+  await page.locator('#presetNameInput').fill('Leg day UAT');
+  for (const name of ['Squat', 'Leg curl']) {
+    await page.locator('#presetExerciseInput').fill(name);
+    await page.locator('#addPresetExerciseButton').click();
+  }
+  await page.locator('.draft-exercise-name').first().fill('Smith squat');
+  await page.locator('.add-planned-set').first().click();
+  await page.locator('.add-planned-set').first().click();
+  for (const [index, row] of (await page.locator('.planned-set-row').all()).entries()) {
+    await row.locator('input').nth(0).fill(String(20 + index * 5));
+    await row.locator('input').nth(1).fill('8');
+  }
   await drag('#presetDraftList', 0, 1);
   assert.equal(await page.locator('.draft-exercise-name').first().inputValue(), 'Leg curl');
   await page.locator('#presetForm button[type="submit"]').click();
   const presetCard = page.locator('.preset-card').filter({ hasText: 'Leg day UAT' });
   await presetCard.locator('.start-workout-button').click();
   assert.equal(await page.locator('#activeWorkoutName').textContent(), 'Leg day UAT');
-  assert.equal(await page.locator('#activeWorkoutMeta').textContent(), '0 of 2 sets');
+  assert.equal(await page.locator('#activeWorkoutMeta').textContent(), '0 of 4 sets');
   assert.equal(await page.locator('.session-exercise').count(), 2);
-  assert.equal(await page.locator('#logView').isVisible(), true);
-  await page.locator('.workout-exercise-row').last().click();
-  assert.equal(await page.locator('#exerciseInput').inputValue(), 'Smith squat');
-  await page.locator('#setForm button[type="submit"]').click();
-  assert.equal(await page.locator('#activeWorkoutMeta').textContent(), '1 of 2 sets');
-  assert.equal(await page.locator('.session-logged').textContent(), '20 kg × 8');
-  assert.equal(await page.locator('#exerciseInput').inputValue(), 'Leg curl');
+  assert.equal(await page.locator('.log-panel').isVisible(), false, 'No duplicate log form');
+  let squat = await openExercise('Smith squat');
+  assert.equal(await squat.locator('.training-set').count(), 3);
+  await page.locator('#trainingSettings summary').click();
+  await page.locator('#weightStep').selectOption('5');
+  await page.locator('#restEnabled').check();
+  await page.locator('#trainingSettings summary').click();
+  // Save an out-of-order row, undo it, and check that no earlier row shifts.
+  await squat.locator('.training-set').nth(2).locator('.set-check').click();
+  assert.equal(await page.locator('#activeWorkoutMeta').textContent(), '1 of 4 sets');
+  await page.locator('#undoPanel button').click();
+  assert.equal(await page.locator('#activeWorkoutMeta').textContent(), '0 of 4 sets');
+  assert.equal(await page.locator('#restPanel').isVisible(), false);
+  squat = await openExercise('Smith squat');
+  await squat.locator('.training-set').nth(0).getByRole('button', { name: 'More weight', exact: true }).click();
+  assert.equal(await squat.locator('.training-set').nth(0).locator('input').first().inputValue(), '25');
+  await squat.locator('.training-set').nth(0).locator('.set-check').click();
+  assert.equal(await page.locator('#restPanel').isVisible(), true);
+  await page.locator('#restPanel').getByRole('button', { name: '+30 sec', exact: true }).click();
   await waitSaved();
-  const originalRecords = JSON.stringify((await state()).records);
+  const deadline = (await state()).training.rest.endAt;
+  await page.reload();
+  await page.locator('#restCountdown').waitFor();
+  await waitSaved();
+  assert.equal((await state()).training.rest.endAt, deadline, 'Reload does not restart the timer');
+  await page.locator('#restPanel').getByRole('button', { name: 'Skip', exact: true }).click();
+  squat = await openExercise('Smith squat');
+  await squat.locator('.training-set').nth(1).getByRole('button', { name: 'Copy previous set' }).click();
+  assert.equal(await squat.locator('.training-set').nth(1).locator('input').first().inputValue(), '25');
+  await squat.locator('.training-set').nth(1).getByRole('button', { name: 'More reps', exact: true }).click();
+  await squat.locator('.training-set').nth(1).locator('.set-check').click();
+  await squat.locator('.training-set').nth(2).locator('.set-check').click();
+  const curl = await openExercise('Leg curl');
+  await curl.getByRole('button', { name: 'Log time, distance or notes' }).click();
+  await page.locator('#typeSelect').selectOption('duration');
+  await page.locator('#durationInput').fill('5');
+  await page.locator('#notesInput').fill('Time tracking remains available.');
+  await page.locator('#setForm button[type="submit"]').click();
+  await waitSaved();
+  const timeSet = (await state()).records.find((record) => record.notes === 'Time tracking remains available.');
+  assert.equal(timeSet.type, 'duration');
+  assert.equal(timeSet.workoutSetIndex, 0);
+  await page.locator('#finishWorkoutButton').click();
+  assert.match(await page.locator('#completionPanel').textContent(), /665 kg/); // 25*8 + 25*9 + 30*8
+  assert.equal(await page.locator('.completion-bar').count(), 1);
+  await waitSaved();
+  const history = (await state()).records;
+  await page.locator('[data-view="workouts"]').click();
+  await presetCard.locator('.start-workout-button').click();
+  squat = await openExercise('Smith squat');
+  assert.deepEqual(await squat.locator('.previous-set').allTextContents(), ['Last time: 25 kg × 8', 'Last time: 25 kg × 9', 'Last time: 30 kg × 8']);
+  await squat.locator('.training-set').first().locator('.set-check').click(); // 20*8
+  await squat.locator('.training-set').first().getByRole('button', { name: 'Edit', exact: true }).click();
+  await squat.locator('.training-set').first().locator('input').first().fill('22.5');
+  await squat.locator('.training-set').first().locator('.set-check').click();
+  await waitSaved();
+  let saved = await state();
+  assert.equal(saved.records.length, 5, 'Editing preserves record IDs');
+  assert.equal(saved.records[0].weight, 22.5);
+  await page.locator('#undoPanel button').click();
+  await waitSaved();
+  assert.equal((await state()).records[0].weight, 20, 'Undo restores edited values');
   await page.locator('#editWorkoutButton').click();
   await page.locator('.add-planned-set').first().click();
   await page.locator('#presetForm button[type="submit"]').click();
   await waitSaved();
-  let saved = await state();
+  saved = await state();
   assert.equal(saved.activeWorkout.exercises[0].plannedSets.length, 2);
   assert.equal(saved.presets.find(({ name }) => name === 'Leg day UAT').exercises[0].sets.length, 1);
-  assert.equal(JSON.stringify(saved.records), originalRecords);
   await page.locator('#editWorkoutButton').click();
   await page.locator('.add-planned-set').first().click();
   await page.locator('#presetSaveScope').selectOption('both');
@@ -79,58 +140,64 @@ try {
   await waitSaved();
   assert.equal((await state()).presets.find(({ name }) => name === 'Leg day UAT').exercises[0].sets.length, 3);
   await drag('#activeExerciseList', 0, 1);
-  await waitSaved();
-  await page.reload();
-  await page.locator('#sessionBanner').waitFor({ state: 'visible' });
-  assert.equal(await page.locator('#activeWorkoutMeta').textContent(), '1 of 4 sets');
   await page.locator('[data-view="feedback"]').click();
-  await page.locator('#feedbackCase').selectOption('switch');
+  await page.locator('#feedbackCase').selectOption('undo-edit');
   await page.locator('#feedbackResult').selectOption('issue');
-  await page.locator('#feedbackMessage').fill('A test note, safely in my profile.');
+  await page.locator('#feedbackMessage').fill('Test feedback in my profile.');
   await page.locator('#feedbackForm button').click();
   await waitSaved();
   assert.equal((await state()).feedback.length, 1);
-  assert.equal(JSON.stringify((await state()).records), originalRecords);
-  const secondContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
-  const phone = await secondContext.newPage();
+  const second = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, reducedMotion: 'reduce' });
+  const phone = await second.newPage();
+  phone.on('pageerror', (error) => failures.push(error.message));
   phone.on('dialog', (dialog) => dialog.accept());
   await phone.goto(base);
   await phone.locator('#profileNameInput').fill('UAT Tester');
   await phone.locator('#profileForm button').click();
   await phone.locator('[data-view="feedback"]').click();
-  assert.match(await phone.locator('#feedbackHistory').textContent(), /A test note/);
+  assert.match(await phone.locator('#feedbackHistory').textContent(), /Test feedback/);
   await phone.locator('#sessionOverviewButton').click();
-  await phone.locator('#weightInput').scrollIntoViewIfNeeded();
-  await phone.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
-  const banner = await phone.locator('#sessionBanner').boundingBox();
-  assert.ok(banner.y >= -1 && banner.y < 20, 'Workout title stays at top when scrolled');
+  await openExercise('Smith squat', phone);
   for (const width of [390, 320]) {
     await phone.setViewportSize({ width, height: 844 });
     assert.equal(await phone.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `No overflow at ${width}px`);
   }
   await phone.setViewportSize({ width: 390, height: 844 });
-  await phone.locator('#sessionOverviewButton').click();
+  assert.equal(await phone.locator('#activeExerciseList').evaluate((node) => getComputedStyle(node).maxHeight), 'none');
+  await phone.evaluate(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'instant' }));
+  const bannerY = (await phone.locator('#sessionBanner').boundingBox()).y;
+  assert.ok(bannerY >= -1 && bannerY < 20, 'Sticky workout title');
+  await phone.evaluate(() => window.scrollTo({ top: 0, behavior: 'instant' }));
   if (process.env.SCHNEGGEN_SCREENSHOT) await phone.screenshot({ path: process.env.SCHNEGGEN_SCREENSHOT, fullPage: true });
-  // Actual touch events exercise the same handles used on phones.
+  // Real touch events test phone reorder, without synthetic DOM event shortcuts.
   const source = phone.locator('#activeExerciseList .drag-handle').last();
   await source.scrollIntoViewIfNeeded();
   const sourceBox = await source.boundingBox();
-  const listBox = await phone.locator('#activeExerciseList').boundingBox();
-  const touch = await secondContext.newCDPSession(phone);
-  const x = sourceBox.x + sourceBox.width / 2;
-  const y = sourceBox.y + sourceBox.height / 2;
+  const target = await phone.locator('#activeExerciseList > [data-reorder-row]').first().boundingBox();
+  const touch = await second.newCDPSession(phone);
+  const x = sourceBox.x + sourceBox.width / 2, y = sourceBox.y + sourceBox.height / 2;
   await touch.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
-  for (let step = 1; step <= 20; step += 1) {
-    await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + (listBox.y + 12 - y) * step / 20 }] });
-  }
+  for (let step = 1; step <= 20; step += 1) await touch.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y + (Math.max(150, target.y + 30) - y) * step / 20 }] });
   await phone.waitForFunction(() => document.querySelector('#activeExerciseList .drop-target'));
   await touch.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
   assert.equal(await phone.locator('.workout-exercise-copy strong').first().textContent(), 'Leg curl');
   await phone.locator('#finishWorkoutButton').click();
   assert.equal(await phone.locator('#sessionBanner').isVisible(), false);
-  assert.equal(await phone.locator('#lastPerformanceCard').isVisible(), false);
+  assert.equal(await phone.locator('.completion-bar').count(), 2);
+  assert.match(await phone.locator('#completionPanel').textContent(), /160 kg/);
+  assert.match(await phone.locator('#completionPanel').textContent(), /-505 kg/);
+  await waitSaved(phone);
+  const final = await state();
+  assert.equal(final.training.completion.name, 'Leg day UAT');
+  assert.deepEqual(final.records.filter((record) => history.some(({ id }) => record.id === id)), history);
+  await phone.reload();
+  await phone.locator('#completionPanel').waitFor({ state: 'visible' });
+  assert.equal(await phone.locator('.completion-bar').count(), 2);
   assert.deepEqual(failures, []);
-  console.log('PASS: preset rename + real drag, immediate overview, out-of-order logging, both edit scopes, preserved history, session drag + reload, central feedback across browsers, 390/320px layout, sticky title, finish clears context.');
+  console.log('PASS: English UI; preset rename and real drag; accordion; per-set history; out-of-order logging and undo; configurable +/- and copy; inline edit; timer +30/skip/reload; both template-edit scopes; central settings/feedback; 390/320px layout; sticky title; touch reorder; completion totals/graph/reload; old history unchanged.');
+} catch (error) {
+  if (page && process.env.SCHNEGGEN_SCREENSHOT) await page.screenshot({ path: process.env.SCHNEGGEN_SCREENSHOT, fullPage: true });
+  throw error;
 } finally {
   await browser.close();
   await app.close();

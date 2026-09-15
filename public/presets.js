@@ -119,6 +119,30 @@ const previousSnapshot = (record) => record ? {
   distance: record.distance ?? null,
 } : null;
 
+export const previousExerciseSets = (records, exercise, identity = {}, excludeWorkoutId = '') => {
+  const matches = (Array.isArray(records) ? records : []).filter((record) =>
+    (!excludeWorkoutId || record.workoutId !== excludeWorkoutId) && (
+      exerciseKey(record.exercise) === exerciseKey(exercise) ||
+      (identity.id && identity.presetId && record.workoutExerciseId === identity.id && record.presetId === identity.presetId)
+    ));
+  const latest = latestExerciseSet(matches, exercise, identity);
+  if (!latest) return [];
+  // Legacy imports without workout IDs can still be compared by their recorded day.
+  const session = matches.filter((record) => latest.workoutId
+    ? record.workoutId === latest.workoutId
+    : !record.workoutId && new Date(record.date).toDateString() === new Date(latest.date).toDateString());
+  session.sort((a, b) => Number.isInteger(a.workoutSetIndex) && Number.isInteger(b.workoutSetIndex)
+    ? a.workoutSetIndex - b.workoutSetIndex : Date.parse(a.date) - Date.parse(b.date));
+  const snapshots = [];
+  session.filter((record) => Number.isInteger(record.workoutSetIndex)).forEach((record) => { snapshots[record.workoutSetIndex] = previousSnapshot(record); });
+  session.filter((record) => !Number.isInteger(record.workoutSetIndex)).forEach((record) => {
+    let index = 0;
+    while (snapshots[index]) index += 1;
+    snapshots[index] = previousSnapshot(record);
+  });
+  return Array.from({ length: Math.min(snapshots.length, MAX_PRESET_SETS) }, (_, index) => snapshots[index] || null);
+};
+
 export const startWorkout = (preset, records, now = new Date()) => {
   const cleanPreset = normalisePreset(preset);
   if (!cleanPreset) return null;
@@ -135,6 +159,7 @@ export const startWorkout = (preset, records, now = new Date()) => {
       name: exercise.name,
       plannedSets: exercise.sets.map(normalisePlannedSet),
       previous: previousSnapshot(latestExerciseSet(records, exercise.name, { id: exercise.id, presetId: cleanPreset.id })),
+      previousSets: previousExerciseSets(records, exercise.name, { id: exercise.id, presetId: cleanPreset.id }),
       completedSetIds: [],
     })),
   };
@@ -157,6 +182,7 @@ export const normaliseActiveWorkout = (input = {}) => {
         previous: exercise?.previous && typeof exercise.previous === 'object'
           ? previousSnapshot(exercise.previous)
           : null,
+        ...(Array.isArray(exercise.previousSets) ? { previousSets: exercise.previousSets.slice(0, MAX_PRESET_SETS).map(previousSnapshot) } : {}),
         completedSetIds: [...new Set(
           (Array.isArray(exercise?.completedSetIds) ? exercise.completedSetIds : [])
             .map((id) => String(id).slice(0, 80))
@@ -218,7 +244,8 @@ export const reviseActiveWorkout = (input, preset, records = []) => {
   if (!active || !clean) throw new TypeError('Add a name and an exercise.');
   const exercises = clean.exercises.map((exercise) => {
     const previous = active.exercises.find(({ id }) => id === exercise.id);
-    if (previous && exercise.sets.length < previous.completedSetIds.length) {
+    const lastLoggedSlot = Math.max(-1, ...records.filter((record) => previous?.completedSetIds.includes(record.id)).map((record) => record.workoutSetIndex ?? -1));
+    if (previous && exercise.sets.length < Math.max(previous.completedSetIds.length, lastLoggedSlot + 1)) {
       throw new TypeError('Keep the sets already logged.');
     }
     return {
@@ -227,6 +254,7 @@ export const reviseActiveWorkout = (input, preset, records = []) => {
       plannedSets: exercise.sets,
       completedSetIds: previous?.completedSetIds || [],
       previous: previous?.previous || previousSnapshot(latestExerciseSet(records, exercise.name)),
+      previousSets: previous?.previousSets || previousExerciseSets(records, exercise.name, { id: exercise.id, presetId: active.presetId }, active.id),
     };
   });
   for (const exercise of active.exercises) {

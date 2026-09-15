@@ -12,27 +12,25 @@ import {
   sortRecords,
   todaySummary,
   weeklyVolumeSeries,
-} from './data.js?v=11';
-import { enableWSpeech, swapRs } from './w-speech.js?v=11';
-import { createProfileManager } from './profiles.js?v=11';
-import { prepareProfileStorage } from './sync.js?v=11';
-import { createWorkoutController } from './workouts.js?v=11';
-import { createFeedbackController } from './feedback.js?v=11';
+} from './data.js?v=12';
 
-enableWSpeech();
+import { createProfileManager } from './profiles.js?v=12';
+import { prepareProfileStorage } from './sync.js?v=12';
+import { createWorkoutController } from './workouts.js?v=12';
+import { createFeedbackController } from './feedback.js?v=12';
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
 const scrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
-const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
-const shortDateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
-const longDateFormat = new Intl.DateTimeFormat(undefined, {
+const numberFormat = new Intl.NumberFormat('en-GB', { maximumFractionDigits: 2 });
+const shortDateFormat = new Intl.DateTimeFormat('en-GB', { month: 'short', day: 'numeric' });
+const longDateFormat = new Intl.DateTimeFormat('en-GB', {
   weekday: 'short',
   month: 'short',
   day: 'numeric',
   year: 'numeric',
 });
-const timeFormat = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const timeFormat = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' });
 
 const profileManager = createProfileManager();
 
@@ -600,6 +598,7 @@ function resetForm({ preserveExercise = true } = {}) {
 }
 
 function clearWorkoutExerciseContext() {
+  $('.log-panel').classList.remove('is-history-edit');
   workoutExerciseContext = null;
   $('#lastPerformanceCard').hidden = true;
   $('#currentSetMeta').hidden = true;
@@ -647,7 +646,12 @@ function prepareWorkoutExercise(context) {
   $('#currentSetMeta').textContent = `Set ${setNumber} of ${totalSets}`;
   $('#currentSetMeta').hidden = false;
   $('.log-panel').classList.add('is-workout-entry');
+  $('.log-panel').classList.toggle('is-history-edit', context.openDetails === true);
   $('#setDetails').open = false;
+  if (context.openDetails) {
+    $('#setDetails').open = true;
+    form.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+  }
 }
 
 function editRecord(id) {
@@ -655,6 +659,7 @@ function editRecord(id) {
   if (!record) return;
 
   clearWorkoutExerciseContext();
+  $('.log-panel').classList.add('is-history-edit');
   editingId = id;
   exerciseInput.value = record.exercise;
   typeSelect.value = record.type;
@@ -674,7 +679,7 @@ function editRecord(id) {
 
 function deleteRecord(id) {
   const record = records.find((item) => item.id === id);
-  if (!record || !window.confirm(swapRs(`Delete this ${record.exercise} set?`))) return;
+  if (!record || !window.confirm((`Delete this ${record.exercise} set?`))) return;
   records = records.filter((item) => item.id !== id);
   workoutController?.recordRemoved(id);
   persist();
@@ -732,6 +737,8 @@ form.addEventListener('submit', (event) => {
     workoutName: existing?.workoutName || workoutExerciseContext?.workoutName,
     workoutStartedAt: existing?.workoutStartedAt || workoutExerciseContext?.workoutStartedAt,
     workoutExerciseId: existing?.workoutExerciseId || workoutExerciseContext?.exerciseId,
+    ...(Number.isInteger(existing?.workoutSetIndex ?? workoutExerciseContext?.setIndex)
+      ? { workoutSetIndex: existing?.workoutSetIndex ?? workoutExerciseContext.setIndex } : {}),
     createdAt: existing?.createdAt,
   });
 
@@ -795,6 +802,7 @@ $('#exportButton').addEventListener('click', () => {
     workoutPlan: workoutController.getWorkoutPlan(),
     feedback: feedbackController.getFeedback(),
     activeWorkout: workoutController.getActiveWorkout(),
+    training: workoutController.getTrainingState(),
   })], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -814,7 +822,7 @@ $('#importInput').addEventListener('change', async (event) => {
     const imported = parseBackup(text);
     const importedPresets = workoutController.previewImport(text);
     const presetCopy = importedPresets === null ? '' : ` and ${importedPresets.length} presets`;
-    if (!window.confirm(swapRs(`Add ${imported.length} sets${presetCopy}? Existing data stays.`))) {
+    if (!window.confirm((`Add ${imported.length} sets${presetCopy}? Existing data stays.`))) {
       return;
     }
     records = mergeRecords(records, imported);
@@ -855,12 +863,33 @@ $('#profileButton').addEventListener('click', () => {
   location.reload();
 });
 
+function saveWorkoutSet({ existing, exercise, active, index, weight, reps }) {
+  const candidate = normaliseRecord({
+    ...(existing || {}),
+    exercise: existing?.exercise || exercise.name,
+    type: 'strength', date: existing?.date || new Date().toISOString(), weight, reps,
+    workoutId: active.id, presetId: active.presetId, workoutName: existing?.workoutName || active.name,
+    workoutStartedAt: active.startedAt, workoutExerciseId: exercise.id, workoutSetIndex: index,
+  });
+  if (!candidate) { showToast('Check the weight and reps.'); return null; }
+  if (existing) records = records.map((record) => record.id === existing.id ? candidate : record);
+  else { records.push(candidate); workoutController.recordSaved(candidate); }
+  persist(); renderAll();
+  return { undo() {
+    if (existing) records = records.map((record) => record.id === candidate.id ? existing : record);
+    else { records = records.filter((record) => record.id !== candidate.id); workoutController.recordRemoved(candidate.id); }
+    persist(); renderAll();
+  } };
+}
+
 workoutController = createWorkoutController({
   formatRecord: formatSet,
   onLogExercise: prepareWorkoutExercise,
   onShowView: showView,
   onToast: showToast,
   onSessionChange: prepareWorkoutExercise,
+  onSaveWorkoutSet: saveWorkoutSet,
+  onEditRecord: editRecord,
   storage: profileStorage,
 });
 feedbackController = createFeedbackController({ storage: profileStorage, onToast: showToast });

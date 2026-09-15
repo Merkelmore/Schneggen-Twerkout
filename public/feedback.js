@@ -11,6 +11,10 @@ export const UAT_CASES = [
   { id: 'resume', title: 'Resume and previous sets', steps: 'Log a set, reload, then continue the workout.', expected: 'The same workout and progress return. Last-time weight and reps are visible.' },
   { id: 'progress', title: 'Compare progress', steps: 'Open Progress. Switch between Weeks and Preset workouts.', expected: 'Logged weight × reps contributes to the correct totals.' },
   { id: 'schedule', title: 'Suggested workout', steps: 'Assign a preset to today or save a rotation in Workout plan.', expected: 'Today or Up next offers the correct preset.' },
+  {"id":"quick-input","title":"Quick set entry","steps":"Choose a weight step. Try plus/minus, then Copy previous set on the next row.","expected":"Buttons use your selected step. Copy uses the previous saved set."},
+  {"id":"undo-edit","title":"Edit and undo","steps":"Check a set and choose Undo. Save it again, then tap Edit and change a value.","expected":"Undo restores the previous state. Editing never creates a duplicate set."},
+  {"id":"rest","title":"Rest timer","steps":"Enable Rest after each set. Save a set, add 30 seconds, reload and skip the rest.","expected":"The countdown stays accurate after reloading. Skip ends the rest."},
+  {"id":"completion","title":"Workout summary","steps":"Log and finish two workouts from the same preset.","expected":"The summary shows total volume, the previous workout, the difference and a graph."},
 ];
 
 export const normaliseFeedback = (items) => (Array.isArray(items) ? items : [])

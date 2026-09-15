@@ -1,18 +1,19 @@
-import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=11';
+import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=12';
 import {
   ACTIVE_WORKOUT_STORAGE_KEY,
   FIRST_VISIT_STORAGE_KEY,
   PRESET_STORAGE_KEY,
   normaliseActiveWorkout,
   normalisePresets,
-} from './presets.js?v=11';
+} from './presets.js?v=12';
 import {
   WORKOUT_PLAN_STORAGE_KEY,
   mergeWorkoutPlans,
   normaliseWorkoutPlan,
-} from './plans.js?v=11';
-import { normaliseProfileName } from './profiles.js?v=11';
-import { FEEDBACK_STORAGE_KEY, normaliseFeedback, mergeFeedback } from './feedback.js?v=11';
+} from './plans.js?v=12';
+import { normaliseProfileName } from './profiles.js?v=12';
+import { FEEDBACK_STORAGE_KEY, normaliseFeedback, mergeFeedback } from './feedback.js?v=12';
+import { TRAINING_STORAGE_KEY, normaliseTraining, mergeTraining } from './training.js?v=12';
 
 const SYNC_META_PREFIX = 'schneggen-server-sync-v1:';
 
@@ -70,6 +71,7 @@ export const normaliseSyncState = (input = {}) => {
     activeWorkout: normaliseActiveWorkout(value.activeWorkout),
     firstVisitSeen: value.firstVisitSeen === true,
     feedback: normaliseFeedback(value.feedback),
+    training: normaliseTraining(value.training),
   };
 };
 
@@ -80,6 +82,7 @@ export const readProfileState = (storage) => normaliseSyncState({
   activeWorkout: parse(safeGet(storage, ACTIVE_WORKOUT_STORAGE_KEY), null),
   firstVisitSeen: safeGet(storage, FIRST_VISIT_STORAGE_KEY) === 'seen',
   feedback: parse(safeGet(storage, FEEDBACK_STORAGE_KEY), []),
+  training: parse(safeGet(storage, TRAINING_STORAGE_KEY), null),
 });
 
 export const writeProfileState = (storage, input) => {
@@ -88,6 +91,7 @@ export const writeProfileState = (storage, input) => {
   safeSet(storage, PRESET_STORAGE_KEY, JSON.stringify(state.presets));
   safeSet(storage, WORKOUT_PLAN_STORAGE_KEY, JSON.stringify(state.workoutPlan));
   safeSet(storage, FEEDBACK_STORAGE_KEY, JSON.stringify(state.feedback));
+  safeSet(storage, TRAINING_STORAGE_KEY, JSON.stringify(state.training));
   if (state.activeWorkout) {
     safeSet(storage, ACTIVE_WORKOUT_STORAGE_KEY, JSON.stringify(state.activeWorkout));
   } else {
@@ -108,6 +112,7 @@ export const mergeProfileStates = (localInput, remoteInput) => {
     activeWorkout: local.activeWorkout || remote.activeWorkout,
     firstVisitSeen: local.firstVisitSeen || remote.firstVisitSeen,
     feedback: mergeFeedback(remote.feedback, local.feedback),
+    training: mergeTraining(local.training, remote.training),
   };
 };
 
