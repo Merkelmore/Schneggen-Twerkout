@@ -12,16 +12,18 @@ import {
   sortRecords,
   todaySummary,
   weeklyVolumeSeries,
-} from './data.js?v=10';
-import { enableWSpeech, swapRs } from './w-speech.js?v=10';
-import { createProfileManager } from './profiles.js?v=10';
-import { prepareProfileStorage } from './sync.js?v=10';
-import { createWorkoutController } from './workouts.js?v=10';
+} from './data.js?v=11';
+import { enableWSpeech, swapRs } from './w-speech.js?v=11';
+import { createProfileManager } from './profiles.js?v=11';
+import { prepareProfileStorage } from './sync.js?v=11';
+import { createWorkoutController } from './workouts.js?v=11';
+import { createFeedbackController } from './feedback.js?v=11';
 
 enableWSpeech();
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
+const scrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
 const shortDateFormat = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric' });
 const longDateFormat = new Intl.DateTimeFormat(undefined, {
@@ -75,6 +77,12 @@ async function startTracker(profile) {
   const profileStorage = await prepareProfileStorage({
     profile,
     storage: profileManager.storageFor(profile),
+    onStatus(status) {
+      $('#syncStatus').hidden = status === 'saved';
+      $('#syncStatus').textContent = status === 'conflict'
+        ? 'Another device changed this profile. Export a backup, then reload to combine changes.'
+        : status === 'saving' ? 'Saving…' : 'Offline · saved here, waiting to sync.';
+    },
   });
   $('#profileGate').hidden = true;
   $('#appShell').hidden = false;
@@ -94,6 +102,7 @@ const toast = $('#toast');
 let records = loadRecords();
 let editingId = null;
 let workoutController;
+let feedbackController;
 let workoutExerciseContext = null;
 let toastTimer;
 let installPrompt;
@@ -577,6 +586,7 @@ function renderAll() {
 }
 
 function resetForm({ preserveExercise = true } = {}) {
+  $('#logTitle').textContent = 'Log set';
   const exercise = preserveExercise ? exerciseInput.value : '';
   const type = preserveExercise ? typeSelect.value : 'strength';
   form.reset();
@@ -592,9 +602,17 @@ function resetForm({ preserveExercise = true } = {}) {
 function clearWorkoutExerciseContext() {
   workoutExerciseContext = null;
   $('#lastPerformanceCard').hidden = true;
+  $('#currentSetMeta').hidden = true;
+  $('.log-panel').classList.remove('is-workout-entry');
+  $('#setDetails').open = true;
 }
 
 function prepareWorkoutExercise(context) {
+  if (!context) {
+    clearWorkoutExerciseContext();
+    resetForm({ preserveExercise: false });
+    return;
+  }
   const {
     name,
     previous,
@@ -620,14 +638,16 @@ function prepareWorkoutExercise(context) {
   $('#cancelEditButton').hidden = true;
   $('#lastPerformanceValue').textContent = previous ? formatSet(previous) : 'No previous set yet';
   $('#lastPerformanceDate').textContent = [
-    setNumber ? `Set ${setNumber} of ${totalSets}` : '',
     previous ? `Last ${longDateFormat.format(new Date(previous.date))}` : '',
   ].filter(Boolean).join(' · ');
   $('#lastPerformanceCard').hidden = false;
   updateMetricFields();
   showView('log');
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  exerciseInput.focus();
+  $('#logTitle').textContent = name;
+  $('#currentSetMeta').textContent = `Set ${setNumber} of ${totalSets}`;
+  $('#currentSetMeta').hidden = false;
+  $('.log-panel').classList.add('is-workout-entry');
+  $('#setDetails').open = false;
 }
 
 function editRecord(id) {
@@ -648,7 +668,7 @@ function editRecord(id) {
   $('#cancelEditButton').hidden = false;
   updateMetricFields();
   showView('log');
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  form.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   exerciseInput.focus();
 }
 
@@ -656,6 +676,7 @@ function deleteRecord(id) {
   const record = records.find((item) => item.id === id);
   if (!record || !window.confirm(swapRs(`Delete this ${record.exercise} set?`))) return;
   records = records.filter((item) => item.id !== id);
+  workoutController?.recordRemoved(id);
   persist();
   if (editingId === id) resetForm({ preserveExercise: false });
   renderAll();
@@ -663,6 +684,7 @@ function deleteRecord(id) {
 }
 
 function showView(name) {
+  $('#appShell').dataset.view = name;
   $$('.tab').forEach((tab) => {
     const active = tab.dataset.view === name;
     tab.classList.toggle('is-active', active);
@@ -682,7 +704,7 @@ function showView(name) {
     renderProgress();
   }
   if (name === 'history') renderHistory();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: scrollBehavior() });
 }
 
 form.addEventListener('submit', (event) => {
@@ -709,6 +731,7 @@ form.addEventListener('submit', (event) => {
     presetId: existing?.presetId || workoutExerciseContext?.presetId,
     workoutName: existing?.workoutName || workoutExerciseContext?.workoutName,
     workoutStartedAt: existing?.workoutStartedAt || workoutExerciseContext?.workoutStartedAt,
+    workoutExerciseId: existing?.workoutExerciseId || workoutExerciseContext?.exerciseId,
     createdAt: existing?.createdAt,
   });
 
@@ -736,7 +759,8 @@ form.addEventListener('submit', (event) => {
     if (nextWorkoutContext) prepareWorkoutExercise(nextWorkoutContext);
     else {
       clearWorkoutExerciseContext();
-      showView('workouts');
+      resetForm({ preserveExercise: false });
+      showView('log');
     }
   }
 });
@@ -746,7 +770,9 @@ $('#cancelEditButton').addEventListener('click', () => {
   clearWorkoutExerciseContext();
   resetForm({ preserveExercise: false });
 });
-$('#backToWorkoutButton').addEventListener('click', () => showView('workouts'));
+$('#backToWorkoutButton').addEventListener('click', () => {
+  $('#activeWorkoutPanel').scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+});
 exerciseInput.addEventListener('input', () => {
   if (workoutExerciseContext
       && exerciseInput.value.trim().toLocaleLowerCase() !== workoutExerciseContext.name.toLocaleLowerCase()) {
@@ -767,6 +793,8 @@ $('#exportButton').addEventListener('click', () => {
   const blob = new Blob([serialiseBackup(records, {
     presets: workoutController.getPresets(),
     workoutPlan: workoutController.getWorkoutPlan(),
+    feedback: feedbackController.getFeedback(),
+    activeWorkout: workoutController.getActiveWorkout(),
   })], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -791,6 +819,7 @@ $('#importInput').addEventListener('change', async (event) => {
     }
     records = mergeRecords(records, imported);
     workoutController.importFromBackup(text);
+    feedbackController.importBackup(text);
     persist();
     renderAll();
     showToast('Import added.');
@@ -831,21 +860,24 @@ workoutController = createWorkoutController({
   onLogExercise: prepareWorkoutExercise,
   onShowView: showView,
   onToast: showToast,
+  onSessionChange: prepareWorkoutExercise,
   storage: profileStorage,
 });
+feedbackController = createFeedbackController({ storage: profileStorage, onToast: showToast });
 
 dateInput.value = toLocalInputValue();
 updateMetricFields();
 renderAll();
 
 const requestedView = location.hash.slice(1);
-const availableViews = ['workouts', 'log', 'progress', 'history'];
+const availableViews = ['workouts', 'log', 'progress', 'history', 'feedback'];
 const workoutNeedsAttention = workoutController.shouldShowFirstVisit()
   || workoutController.hasActiveWorkout()
   || workoutController.hasSuggestedWorkout();
 const initialView = availableViews.includes(requestedView)
   ? requestedView
-  : workoutNeedsAttention ? 'workouts' : 'log';
+  : workoutController.hasActiveWorkout() ? 'log' : workoutNeedsAttention ? 'workouts' : 'log';
+if (workoutController.hasActiveWorkout()) prepareWorkoutExercise(workoutController.getSelectedContext());
 showView(initialView);
 
 if ('serviceWorker' in navigator) {

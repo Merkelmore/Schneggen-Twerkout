@@ -68,15 +68,15 @@ const hasChoices = (plan) => (
 export const mergeWorkoutPlans = (localInput, remoteInput) => {
   const local = normaliseWorkoutPlan(localInput);
   const remote = normaliseWorkoutPlan(remoteInput);
-  if (!hasChoices(local) && hasChoices(remote)) return remote;
-  if (hasChoices(local) && !hasChoices(remote)) return local;
   const localTime = new Date(local.updatedAt || 0).getTime();
   const remoteTime = new Date(remote.updatedAt || 0).getTime();
+  if (localTime !== remoteTime) return remoteTime > localTime ? remote : local;
+  if (!hasChoices(local) && hasChoices(remote)) return remote;
   return remoteTime > localTime ? remote : local;
 };
 
 const recordTime = (record) => {
-  const value = new Date(record?.workoutStartedAt || record?.date || record?.createdAt || 0).getTime();
+  const value = new Date(record?.workoutStartedAt || record?.createdAt || record?.date || 0).getTime();
   return Number.isNaN(value) ? 0 : value;
 };
 

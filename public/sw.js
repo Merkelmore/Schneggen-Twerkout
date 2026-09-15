@@ -1,20 +1,22 @@
-const CACHE = 'schneggen-twerkout-v10';
+const CACHE = 'schneggen-twerkout-v11';
 const ASSETS = [
   '/',
   '/index.html',
-  '/styles.css?v=10',
-  '/app.js?v=10',
-  '/data.js?v=10',
-  '/presets.js?v=10',
-  '/plans.js?v=10',
-  '/workouts.js?v=10',
-  '/profiles.js?v=10',
-  '/sync.js?v=10',
-  '/w-speech.js?v=10',
+  '/styles.css?v=11',
+  '/app.js?v=11',
+  '/data.js?v=11',
+  '/presets.js?v=11',
+  '/plans.js?v=11',
+  '/workouts.js?v=11',
+  '/profiles.js?v=11',
+  '/sync.js?v=11',
+  '/feedback.js?v=11',
+  '/reorder.js?v=11',
+  '/w-speech.js?v=11',
   '/snail.svg',
   '/icon-192.png',
   '/icon-512.png',
-  '/manifest.webmanifest?v=10',
+  '/manifest.webmanifest?v=11',
 ];
 
 self.addEventListener('install', (event) => {
@@ -32,6 +34,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  if (new URL(event.request.url).pathname.startsWith('/api/')) return;
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
@@ -48,14 +51,14 @@ self.addEventListener('fetch', (event) => {
 
   event.respondWith(
     caches.match(event.request).then((cached) => {
-      const network = fetch(event.request).then((response) => {
+      if (cached) return cached;
+      return fetch(event.request).then((response) => {
         if (response.ok && new URL(event.request.url).origin === self.location.origin) {
           const copy = response.clone();
           caches.open(CACHE).then((cache) => cache.put(event.request, copy));
         }
         return response;
       });
-      return cached || network;
     }),
   );
 });

@@ -8,6 +8,7 @@ import {
   normaliseActiveWorkout,
   normalisePreset,
   parsePresetBackup,
+  reviseActiveWorkout,
   startWorkout,
 } from '../public/presets.js';
 
@@ -104,7 +105,7 @@ test('marks a matching exercise once per saved set', () => {
     name: 'Lower body',
     exercises: [{ name: 'Hip thrust', sets: [{}, {}] }],
   }, records);
-  const saved = { id: 'new-set', exercise: 'hip thrust' };
+  const saved = { id: 'new-set', exercise: 'hip thrust', workoutId: active.id };
   const once = markExerciseDone(active, saved);
   const twice = markExerciseDone(once, saved);
   assert.deepEqual(once.exercises[0].completedSetIds, ['new-set']);
@@ -122,4 +123,41 @@ test('reads rich presets and preserves old backup compatibility', () => {
   }));
   assert.equal(parsed[0].exercises[0].sets.length, 1);
   assert.deepEqual(parsed[1].exercises[0].sets, [{ weight: 40, reps: 8 }]);
+});
+
+test('live rename, reorder and added sets preserve the workout and saved records', () => {
+  const preset = normalisePreset({ id: 'legs', name: 'Leg day', exercises: [
+    { id: 'squat', name: 'Squat', sets: [{ weight: 30, reps: 8 }, {}] },
+    { id: 'curl', name: 'Leg curl', sets: [{}] },
+  ] });
+  const initial = startWorkout(preset, []);
+  assert.equal(initial.selectedExerciseId, 'squat');
+  const saved = { id: 'saved', workoutId: initial.id, workoutExerciseId: 'curl', exercise: 'Leg curl' };
+  const active = markExerciseDone(initial, saved);
+  const changed = reviseActiveWorkout(active, { ...preset, exercises: [
+    { ...preset.exercises[1], name: 'Seated leg curl', sets: [{}, {}] }, preset.exercises[0],
+  ] });
+  assert.equal(changed.id, initial.id);
+  assert.equal(changed.exercises[0].name, 'Seated leg curl');
+  assert.deepEqual(changed.exercises[0].completedSetIds, ['saved']);
+  assert.equal(changed.exercises[0].plannedSets.length, 2);
+  assert.equal(saved.exercise, 'Leg curl');
+  assert.equal(preset.exercises[0].name, 'Squat');
+  const another = markExerciseDone(changed, { ...saved, id: 'next', exercise: 'Seated leg curl' });
+  assert.deepEqual(another.exercises[0].completedSetIds, ['saved', 'next']);
+  assert.throws(() => reviseActiveWorkout(another, { ...preset, exercises: [preset.exercises[0]] }), /logged sets/);
+  assert.throws(() => reviseActiveWorkout(another, preset), /sets already logged/);
+});
+
+test('unrelated standalone or other-session sets never complete the active workout', () => {
+  const active = startWorkout({ name: 'Leg day', exercises: ['Squat'] }, []);
+  assert.equal(markExerciseDone(active, { id: 'set', exercise: 'Squat' }), active);
+  assert.equal(markExerciseDone(active, { id: 'set', exercise: 'Squat', workoutId: 'other' }), active);
+});
+
+test('renamed exercises retain last-time values by preset exercise identity', () => {
+  const active = startWorkout({ id: 'legs', name: 'Leg day', exercises: [{ id: 'squat', name: 'Smith squat' }] }, [
+    { ...records[0], exercise: 'Squat', presetId: 'legs', workoutExerciseId: 'squat' },
+  ]);
+  assert.equal(active.exercises[0].previous.weight, 70);
 });

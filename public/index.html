@@ -8,9 +8,9 @@
     <title>Schneggen-Twerkout</title>
     <link rel="icon" href="/snail.svg" type="image/svg+xml">
     <link rel="apple-touch-icon" href="/icon-192.png">
-    <link rel="manifest" href="/manifest.webmanifest?v=10">
-    <link rel="stylesheet" href="/styles.css?v=10">
-    <script type="module" src="/app.js?v=10"></script>
+    <link rel="manifest" href="/manifest.webmanifest?v=11">
+    <link rel="stylesheet" href="/styles.css?v=11">
+    <script type="module" src="/app.js?v=11"></script>
   </head>
   <body>
     <section class="profile-gate" id="profileGate" aria-labelledby="profileTitle">
@@ -32,7 +32,7 @@
           <div id="profileButtons"></div>
         </div>
         <p class="profile-message" id="profileMessage" role="alert"></p>
-        <small class="profile-note">Saved on this device.</small>
+        <small class="profile-note">Saved in your profile.</small>
       </div>
     </section>
 
@@ -55,6 +55,21 @@
         </div>
       </header>
 
+      <section class="session-banner" id="sessionBanner" aria-label="Current workout" hidden>
+        <div class="session-title">
+          <span class="eyebrow">In progress</span>
+          <h2 id="activeWorkoutName">Workout</h2>
+          <span id="activeWorkoutMeta" class="active-workout-meta"></span>
+        </div>
+        <div class="session-actions">
+          <button class="mini-button" id="sessionOverviewButton" type="button">Overview</button>
+          <button class="mini-button" id="editWorkoutButton" type="button">Edit workout</button>
+          <button class="finish-button" id="finishWorkoutButton" type="button">Finish</button>
+        </div>
+        <div class="workout-progress" aria-hidden="true"><span id="activeWorkoutProgress"></span></div>
+      </section>
+      <p class="sync-status" id="syncStatus" role="status" hidden></p>
+
       <nav class="tab-bar" aria-label="Main navigation">
         <button class="tab" type="button" data-view="workouts">
           <span aria-hidden="true">◎</span> Workout
@@ -68,9 +83,16 @@
         <button class="tab" type="button" data-view="history">
           <span aria-hidden="true">◷</span> History
         </button>
+        <button class="tab" type="button" data-view="feedback">
+          <span aria-hidden="true">♡</span> Feedback
+        </button>
       </nav>
 
       <main>
+        <section class="panel active-workout-panel" id="activeWorkoutPanel" aria-label="Workout overview" hidden>
+          <div class="panel-heading"><h2>Workout overview</h2><small>Tap any exercise</small></div>
+          <div class="active-exercise-list" id="activeExerciseList"></div>
+        </section>
         <section class="view" id="workoutsView" data-view-panel="workouts" hidden>
           <div class="section-heading heading-with-action">
             <div>
@@ -97,21 +119,6 @@
             <button class="suggested-start-button" id="startSuggestedWorkoutButton" type="button">
               Start workout
             </button>
-          </section>
-
-          <section class="panel active-workout-panel" id="activeWorkoutPanel" hidden>
-            <div class="panel-heading active-workout-heading">
-              <div>
-                <p class="eyebrow">In progress</p>
-                <h2 id="activeWorkoutName">Workout</h2>
-                <p id="activeWorkoutMeta" class="active-workout-meta"></p>
-              </div>
-              <button class="text-button" id="finishWorkoutButton" type="button">Finish</button>
-            </div>
-            <div class="workout-progress" aria-hidden="true">
-              <span id="activeWorkoutProgress"></span>
-            </div>
-            <div class="active-exercise-list" id="activeExerciseList"></div>
           </section>
 
           <details class="panel workout-plan-panel" id="workoutPlanPanel">
@@ -168,8 +175,15 @@
               </div>
               <div class="exercise-picker" id="presetExerciseSuggestions" aria-label="Exercise suggestions"></div>
               <div class="preset-draft-list" id="presetDraftList"></div>
+              <label class="field" id="presetSaveScopeField" hidden>
+                <span>Apply to</span>
+                <select id="presetSaveScope">
+                  <option value="workout">This workout only</option>
+                  <option value="both">This workout + preset</option>
+                </select>
+              </label>
               <button class="primary-button" type="submit">
-                <img src="/snail.svg" alt=""> Save preset
+                <img src="/snail.svg" alt=""> <span id="presetSaveLabel">Save preset</span>
               </button>
             </form>
           </section>
@@ -193,13 +207,14 @@
             <div class="panel-heading">
               <div>
                 <h2 id="logTitle">Log set</h2>
+                <small id="currentSetMeta" hidden></small>
               </div>
               <button class="text-button" id="cancelEditButton" type="button" hidden>Cancel edit</button>
             </div>
 
             <form id="setForm">
               <div class="field-row">
-                <label class="field field-wide">
+                <label class="field field-wide" id="exerciseField">
                   <span>Exercise</span>
                   <input id="exerciseInput" name="exercise" list="exerciseOptions" maxlength="80" placeholder="e.g. Hip thrust" autocomplete="off" required>
                   <datalist id="exerciseOptions">
@@ -212,15 +227,6 @@
                     <option value="Running"></option>
                   </datalist>
                 </label>
-                <label class="field">
-                  <span>Tracked as</span>
-                  <select id="typeSelect" name="type">
-                    <option value="strength">Weight × reps</option>
-                    <option value="reps">Reps only</option>
-                    <option value="duration">Time</option>
-                    <option value="distance">Distance</option>
-                  </select>
-                </label>
               </div>
 
               <aside class="last-performance-card" id="lastPerformanceCard" hidden>
@@ -230,7 +236,7 @@
                   <strong id="lastPerformanceValue">No previous set yet</strong>
                   <small id="lastPerformanceDate"></small>
                 </div>
-                <button class="text-button" id="backToWorkoutButton" type="button">Back to workout</button>
+                <button class="text-button" id="backToWorkoutButton" type="button">Overview ↑</button>
               </aside>
 
               <div class="metric-fields">
@@ -261,6 +267,17 @@
                 </label>
               </div>
 
+              <details class="set-details" id="setDetails" open>
+                <summary>Details</summary>
+                <label class="field">
+                  <span>Tracked as</span>
+                  <select id="typeSelect" name="type">
+                    <option value="strength">Weight × reps</option>
+                    <option value="reps">Reps only</option>
+                    <option value="duration">Time</option>
+                    <option value="distance">Distance</option>
+                  </select>
+                </label>
               <div class="field-row">
                 <label class="field">
                   <span>When</span>
@@ -271,6 +288,7 @@
                   <input id="notesInput" name="notes" maxlength="240" placeholder="Optional note">
                 </label>
               </div>
+              </details>
 
               <button class="primary-button" type="submit">
                 <img src="/snail.svg" alt=""> <span id="saveButtonLabel">Save set</span>
@@ -393,7 +411,7 @@
           <section class="panel backup-panel" aria-labelledby="backupTitle">
             <div>
               <h2 id="backupTitle">Backup</h2>
-              <p>For another browser or phone.</p>
+              <p>Your own copy.</p>
             </div>
             <div class="backup-actions">
               <button class="secondary-button" id="exportButton" type="button">Export</button>
@@ -403,6 +421,28 @@
               </label>
             </div>
           </section>
+        </section>
+        <section class="view" id="feedbackView" data-view-panel="feedback" hidden>
+          <div class="section-heading"><h1>Little test run 🐌</h1></div>
+          <section class="panel">
+            <div class="panel-heading"><h2>Feedback</h2><small id="feedbackCount"></small></div>
+            <form id="feedbackForm">
+              <label class="field"><span>Test case</span>
+                <select id="feedbackCase"><option value="general">Something else</option></select>
+              </label>
+              <div class="feedback-instructions" id="feedbackInstructions" hidden>
+                <p id="feedbackSteps"></p><p id="feedbackExpected"></p>
+              </div>
+              <label class="field"><span>Result</span>
+                <select id="feedbackResult"><option value="feedback">Suggestion</option><option value="pass">Works ✓</option><option value="issue">Needs fixing</option></select>
+              </label>
+              <label class="field"><span>Your note</span>
+                <textarea id="feedbackMessage" maxlength="2000" rows="3" placeholder="What happened? What would help?"></textarea>
+              </label>
+              <button class="primary-button" type="submit">Save feedback</button>
+            </form>
+          </section>
+          <section class="panel"><h2>Your feedback</h2><div id="feedbackHistory" class="feedback-history"></div></section>
         </section>
       </main>
 
