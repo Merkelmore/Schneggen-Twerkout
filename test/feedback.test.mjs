@@ -8,7 +8,7 @@ import { serialiseBackup } from '../public/data.js';
 const feedback = { id: 'test-1', caseId: 'start', result: 'issue', message: 'My note', createdAt: '2026-09-15T10:00:00Z' };
 
 test('UAT cases have unique IDs, steps and expected outcomes', () => {
-  assert.equal(new Set(UAT_CASES.map(({ id }) => id)).size, 9);
+  assert.equal(new Set(UAT_CASES.map(({ id }) => id)).size, 13);
   assert.ok(UAT_CASES.every(({ steps, expected }) => steps && expected));
 });
 

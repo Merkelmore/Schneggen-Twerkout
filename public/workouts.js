@@ -14,7 +14,7 @@ import {
   parsePresetBackup,
   reviseActiveWorkout,
   startWorkout,
-} from './presets.js?v=11';
+} from './presets.js?v=12';
 import {
   WEEKDAYS,
   WORKOUT_PLAN_STORAGE_KEY,
@@ -23,9 +23,11 @@ import {
   parseWorkoutPlanBackup,
   reconcileWorkoutPlan,
   suggestWorkoutPreset,
-} from './plans.js?v=11';
-import { swapRs } from './w-speech.js?v=11';
-import { attachReorderHandle } from './reorder.js?v=11';
+} from './plans.js?v=12';
+
+import { attachReorderHandle } from './reorder.js?v=12';
+import { createSessionUI } from './session-ui.js?v=12';
+import { setSlots } from './training.js?v=12';
 
 const EXERCISE_LIBRARY = [
   'Around the World',
@@ -65,6 +67,8 @@ export function createWorkoutController({
   onShowView,
   onToast,
   onSessionChange = () => {},
+  onSaveWorkoutSet,
+  onEditRecord,
   storage = globalThis.localStorage,
 }) {
   const firstVisitCard = document.querySelector('#firstVisitCard');
@@ -103,6 +107,10 @@ export function createWorkoutController({
   let editingPresetId = null;
   let editingWorkout = false;
   let firstVisit = read(FIRST_VISIT_STORAGE_KEY) !== 'seen';
+  const trainingUI = createSessionUI({
+    storage, onSave: onSaveWorkoutSet, onEdit: onEditRecord, onToast,
+    onOther(exercise) { const context = exerciseContext(exercise); if (context) onLogExercise({ ...context, openDetails: true }); },
+  });
 
   function read(key) {
     try {
@@ -373,15 +381,18 @@ export function createWorkoutController({
   }
 
   function exerciseContext(exercise) {
-    const completed = exercise.completedSetIds.length;
+    const slots = setSlots(exercise, records);
+    const completed = slots.findIndex((slot) => !slot);
+    if (completed < 0) return null;
     const plannedSet = exercise.plannedSets[completed] ?? null;
     if (!plannedSet) return null;
     return {
       exerciseId: exercise.id,
       name: exercise.name,
-      previous: exercise.previous,
+      previous: exercise.previousSets?.[completed] || exercise.previous,
       plannedSet,
       setNumber: completed + 1,
+      setIndex: completed,
       totalSets: exercise.plannedSets.length,
       workoutId: active.id,
       presetId: active.presetId,
@@ -394,97 +405,57 @@ export function createWorkoutController({
     activePanel.hidden = !active;
     document.querySelector('#sessionBanner').hidden = !active;
     document.querySelector('#appShell').classList.toggle('has-workout', Boolean(active));
+    trainingUI.render(active, records);
     if (!active) return;
-
-    const totalSets = active.exercises.reduce(
-      (total, exercise) => total + exercise.plannedSets.length,
-      0,
-    );
-    const completedSets = active.exercises.reduce(
-      (total, exercise) => total + Math.min(exercise.completedSetIds.length, exercise.plannedSets.length),
-      0,
-    );
+    const totalSets = active.exercises.reduce((total, exercise) => total + exercise.plannedSets.length, 0);
+    const completedSets = active.exercises.reduce((total, exercise) => total + setSlots(exercise, records).filter(Boolean).length, 0);
     activeName.textContent = active.name;
     activeMeta.textContent = `${completedSets} of ${totalSets} sets`;
-    activeProgress.style.width = `${totalSets ? (completedSets / totalSets) * 100 : 0}%`;
+    activeProgress.style.width = `${totalSets ? completedSets / totalSets * 100 : 0}%`;
     activeList.replaceChildren();
-
-    active.exercises.forEach((exercise) => {
+    active.exercises.forEach((exercise, index) => {
       const planned = exercise.plannedSets.length;
-      const completed = Math.min(exercise.completedSetIds.length, planned);
+      const completed = setSlots(exercise, records).filter(Boolean).length;
       const isDone = completed >= planned;
-      const card = element('div', 'session-exercise');
+      const isCurrent = active.selectedExerciseId === exercise.id;
+      const card = element('section', 'session-exercise');
       card.dataset.reorderRow = exercise.id;
       const row = element('button', 'workout-exercise-row');
       row.type = 'button';
-      if (isDone) row.classList.add('is-done');
-      const isCurrent = active.selectedExerciseId === exercise.id && !isDone;
-      if (isCurrent) row.classList.add('is-current');
-      row.setAttribute('aria-pressed', String(isCurrent));
-
-      const status = element('span', 'workout-exercise-status', isDone ? '✓' : '○');
-      status.setAttribute('aria-hidden', 'true');
-
+      row.classList.toggle('is-done', isDone);
+      row.classList.toggle('is-current', isCurrent);
+      row.setAttribute('aria-expanded', String(isCurrent));
+      row.setAttribute('aria-controls', `exercise-body-${index}`);
       const copy = element('span', 'workout-exercise-copy');
-      copy.append(
-        element('strong', null, exercise.name),
-        element(
-          'small',
-          null,
-          isDone ? 'Done' : isCurrent ? 'Current exercise' : completed ? 'Continue anytime' : 'Up next · tap to switch',
-        ),
-      );
-
-      const count = element('span', 'workout-set-count', `${completed}/${planned} sets`);
-      row.append(status, copy, count);
+      copy.append(element('strong', null, exercise.name), element('small', null, isDone ? 'Done' : isCurrent ? 'Current exercise' : completed ? 'Started' : 'Still to come'));
+      row.append(element('span', 'workout-exercise-status', isDone ? '✓' : isCurrent ? '−' : '+'), copy, element('span', 'workout-set-count', `${completed}/${planned}`));
       row.addEventListener('click', () => {
-        if (isDone) {
-          onToast('All planned sets logged. Use + Set to add another.');
-          return;
-        }
-        const context = exerciseContext(exercise);
-        if (!context) return;
-        active.selectedExerciseId = exercise.id;
-        active.updatedAt = new Date().toISOString();
-        saveActive();
-        markWelcomeSeen();
-        renderActive();
-        onLogExercise(context);
+        active.selectedExerciseId = isCurrent ? '' : exercise.id;
+        active.updatedAt = new Date().toISOString(); saveActive(); renderActive();
+        activeList.children[index]?.querySelector('.workout-exercise-row').focus({ preventScroll: true });
       });
+      const body = element('div', 'exercise-body');
+      body.id = `exercise-body-${index}`; body.hidden = !isCurrent;
       const controls = element('div', 'session-exercise-controls');
       const handle = element('button', 'mini-button drag-handle', '⠿');
-      handle.type = 'button';
-      handle.setAttribute('aria-label', `Drag ${exercise.name}`);
+      handle.type = 'button'; handle.setAttribute('aria-label', `Drag ${exercise.name}`);
       attachReorderHandle(handle, card, activeList, moveActiveExercise);
-      const add = element('button', 'mini-button', '+ Set');
-      add.type = 'button';
-      add.setAttribute('aria-label', `Add set to ${exercise.name}`);
-      add.disabled = planned >= MAX_PRESET_SETS;
-      add.addEventListener('click', () => {
-        exercise.plannedSets.push({ ...exercise.plannedSets.at(-1) });
-        active.updatedAt = new Date().toISOString();
-        saveActive(); renderActive();
-        if (isDone) {
-          active.selectedExerciseId = exercise.id;
-          saveActive(); renderActive();
-          onSessionChange(exerciseContext(exercise));
-        }
-      });
-      const index = active.exercises.indexOf(exercise);
+      controls.append(handle);
       for (const [offset, label, symbol] of [[-1, 'up', '↑'], [1, 'down', '↓']]) {
-        const button = element('button', 'mini-button', symbol);
-        button.type = 'button';
-        button.disabled = index + offset < 0 || index + offset >= active.exercises.length;
-        button.setAttribute('aria-label', `Move ${exercise.name} ${label}`);
-        button.addEventListener('click', () => moveActiveExercise(index, index + offset));
-        controls.append(button);
+        const move = element('button', 'mini-button', symbol); move.type = 'button';
+        move.disabled = index + offset < 0 || index + offset >= active.exercises.length;
+        move.setAttribute('aria-label', `${exercise.name} ${label}`);
+        move.addEventListener('click', () => moveActiveExercise(index, index + offset)); controls.append(move);
       }
-      controls.prepend(handle);
+      const add = element('button', 'mini-button', '+ Set'); add.type = 'button';
+      add.disabled = planned >= MAX_PRESET_SETS; add.setAttribute('aria-label', `Add set to ${exercise.name}`);
+      add.addEventListener('click', () => {
+        exercise.plannedSets.push({ ...exercise.plannedSets.at(-1) }); active.selectedExerciseId = exercise.id;
+        active.updatedAt = new Date().toISOString(); saveActive(); renderActive();
+      });
       controls.append(add);
-      card.append(row, controls);
-      const logged = records.filter(({ id }) => exercise.completedSetIds.includes(id));
-      if (logged.length) card.append(element('p', 'session-logged', logged.slice().reverse().map(formatRecord).join(' · ')));
-      activeList.append(card);
+      if (isCurrent) body.append(trainingUI.renderSets(exercise, active, records));
+      card.append(row, controls, body); activeList.append(card);
     });
   }
 
@@ -546,7 +517,8 @@ export function createWorkoutController({
       name.setAttribute('aria-label', `Exercise ${exerciseIndex + 1} name`);
       name.addEventListener('input', () => { exercise.name = name.value; name.setCustomValidity(''); });
       heading.append(handle, name);
-      const loggedCount = editingWorkout ? active.exercises.find(({ id }) => id === exercise.id)?.completedSetIds.length || 0 : 0;
+      const runningExercise = editingWorkout ? active.exercises.find(({ id }) => id === exercise.id) : null;
+      const loggedCount = runningExercise ? setSlots(runningExercise, records).reduce((last, record, index) => record ? index + 1 : last, 0) : 0;
 
       const actions = element('div', 'draft-exercise-actions');
       const up = element('button', 'mini-button', '↑');
@@ -768,7 +740,7 @@ export function createWorkoutController({
   }
 
   function deletePreset(preset) {
-    if (!window.confirm(swapRs(`Delete the ${preset.name} preset?`))) return;
+    if (!window.confirm((`Delete the ${preset.name} preset?`))) return;
     presets = presets.filter((item) => item.id !== preset.id);
     savePresets();
     const reconciled = reconcileWorkoutPlan(workoutPlan, presets);
@@ -782,8 +754,9 @@ export function createWorkoutController({
   }
 
   function startPreset(preset) {
-    if (active && !window.confirm(swapRs(`Replace the active ${active.name} workout?`))) return;
+    if (active && !window.confirm((`Replace the active ${active.name} workout?`))) return;
     active = startWorkout(preset, records);
+    trainingUI.start();
     saveActive();
     markWelcomeSeen();
     closeEditor();
@@ -793,12 +766,15 @@ export function createWorkoutController({
   }
 
   function finishWorkout() {
-    if (!active || !window.confirm(swapRs(`Finish the ${active.name} workout?`))) return;
+    if (!active || !window.confirm((`Finish the ${active.name} workout?`))) return;
+    trainingUI.finish(active, records);
     active = null;
     saveActive();
     onSessionChange(null);
     render();
     onToast('Workout finished.');
+    onShowView('log');
+    document.querySelector('#completionPanel').scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   }
 
   function recordSaved(record) {
@@ -806,6 +782,7 @@ export function createWorkoutController({
     const updated = markExerciseDone(active, record);
     if (updated === active) return null;
     active = updated;
+    trainingUI.recorded(active);
     saveActive();
     render();
     const exercise = active.exercises.find((item) => record.workoutExerciseId ? item.id === record.workoutExerciseId : exerciseKey(item.name) === exerciseKey(record.exercise));
@@ -860,6 +837,7 @@ export function createWorkoutController({
     savePresets();
     const importedPlan = parseWorkoutPlanBackup(text);
     const importedActive = normaliseActiveWorkout(JSON.parse(text)?.activeWorkout);
+    trainingUI.importBackup(text);
     if (!active && importedActive) { active = importedActive; saveActive(); }
     if (importedPlan) {
       workoutPlan = reconcileWorkoutPlan(
@@ -907,6 +885,7 @@ export function createWorkoutController({
   presetForm.addEventListener('submit', savePreset);
 
   return Object.freeze({
+    getTrainingState: () => trainingUI.getState(),
     getActiveWorkout: () => normaliseActiveWorkout(active),
     getSelectedContext,
     getPresets: () => presets.map((preset) => ({

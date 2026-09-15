@@ -14,6 +14,7 @@ import {
 } from '../public/plans.js';
 import { normaliseProfileName } from '../public/profiles.js';
 import { mergeFeedback, normaliseFeedback } from '../public/feedback.js';
+import { normaliseTraining, mergeTraining } from '../public/training.js';
 
 const MAX_RECORDS = 50_000;
 const MAX_PRESETS = 100;
@@ -46,6 +47,7 @@ export const normaliseServerState = (input = {}) => {
     activeWorkout: normaliseActiveWorkout(value.activeWorkout),
     firstVisitSeen: value.firstVisitSeen === true,
     feedback: normaliseFeedback(value.feedback),
+    training: normaliseTraining(value.training),
   };
 };
 
@@ -115,6 +117,14 @@ export function saveProfileState(database, rawName, input, expectedRevision) {
     throw error;
   }
   const state = normaliseServerState({ ...current.state, ...input });
+  // Cached older clients do not know slot numbers. Keep that additive metadata
+  // when they update a known record; never restore records the user deleted.
+  const previousRecords = new Map(current.state.records.map((record) => [record.id, record]));
+  state.records = state.records.map((record) => {
+    const previous = previousRecords.get(record.id);
+    return !Number.isInteger(record.workoutSetIndex) && Number.isInteger(previous?.workoutSetIndex)
+      ? { ...record, workoutSetIndex: previous.workoutSetIndex } : record;
+  });
   state.feedback = mergeFeedback(current.state.feedback, state.feedback);
   const updatedAt = new Date().toISOString();
   database.prepare(`
@@ -141,6 +151,7 @@ export function importProfileBackup(database, rawName, text) {
       ? mergeWorkoutPlans(current.state.workoutPlan, importedPlan)
       : current.state.workoutPlan,
     feedback: mergeFeedback(current.state.feedback, JSON.parse(text)?.feedback),
+    training: mergeTraining(current.state.training, JSON.parse(text)?.training),
   });
 }
 
