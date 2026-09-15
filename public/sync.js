@@ -1,17 +1,18 @@
-import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=10';
+import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=11';
 import {
   ACTIVE_WORKOUT_STORAGE_KEY,
   FIRST_VISIT_STORAGE_KEY,
   PRESET_STORAGE_KEY,
   normaliseActiveWorkout,
   normalisePresets,
-} from './presets.js?v=10';
+} from './presets.js?v=11';
 import {
   WORKOUT_PLAN_STORAGE_KEY,
   mergeWorkoutPlans,
   normaliseWorkoutPlan,
-} from './plans.js?v=10';
-import { normaliseProfileName } from './profiles.js?v=10';
+} from './plans.js?v=11';
+import { normaliseProfileName } from './profiles.js?v=11';
+import { FEEDBACK_STORAGE_KEY, normaliseFeedback, mergeFeedback } from './feedback.js?v=11';
 
 const SYNC_META_PREFIX = 'schneggen-server-sync-v1:';
 
@@ -68,6 +69,7 @@ export const normaliseSyncState = (input = {}) => {
     workoutPlan: normaliseWorkoutPlan(value.workoutPlan),
     activeWorkout: normaliseActiveWorkout(value.activeWorkout),
     firstVisitSeen: value.firstVisitSeen === true,
+    feedback: normaliseFeedback(value.feedback),
   };
 };
 
@@ -77,6 +79,7 @@ export const readProfileState = (storage) => normaliseSyncState({
   workoutPlan: parse(safeGet(storage, WORKOUT_PLAN_STORAGE_KEY), null),
   activeWorkout: parse(safeGet(storage, ACTIVE_WORKOUT_STORAGE_KEY), null),
   firstVisitSeen: safeGet(storage, FIRST_VISIT_STORAGE_KEY) === 'seen',
+  feedback: parse(safeGet(storage, FEEDBACK_STORAGE_KEY), []),
 });
 
 export const writeProfileState = (storage, input) => {
@@ -84,6 +87,7 @@ export const writeProfileState = (storage, input) => {
   safeSet(storage, STORAGE_KEY, JSON.stringify(state.records));
   safeSet(storage, PRESET_STORAGE_KEY, JSON.stringify(state.presets));
   safeSet(storage, WORKOUT_PLAN_STORAGE_KEY, JSON.stringify(state.workoutPlan));
+  safeSet(storage, FEEDBACK_STORAGE_KEY, JSON.stringify(state.feedback));
   if (state.activeWorkout) {
     safeSet(storage, ACTIVE_WORKOUT_STORAGE_KEY, JSON.stringify(state.activeWorkout));
   } else {
@@ -103,6 +107,7 @@ export const mergeProfileStates = (localInput, remoteInput) => {
     workoutPlan: mergeWorkoutPlans(local.workoutPlan, remote.workoutPlan),
     activeWorkout: local.activeWorkout || remote.activeWorkout,
     firstVisitSeen: local.firstVisitSeen || remote.firstVisitSeen,
+    feedback: mergeFeedback(remote.feedback, local.feedback),
   };
 };
 
@@ -116,14 +121,18 @@ const requestProfile = async (fetchImpl, name) => {
   return response.json();
 };
 
-const saveRemoteState = async (fetchImpl, name, state, keepalive = false) => {
+const saveRemoteState = async (fetchImpl, name, state, expectedRevision, keepalive = false) => {
   const response = await fetchImpl(`/api/profiles/${encodeURIComponent(name)}/state`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ state }),
+    body: JSON.stringify({ state, expectedRevision }),
     keepalive,
   });
-  if (!response.ok) throw new Error('Profile sync failed.');
+  if (!response.ok) {
+    const error = new Error('Profile sync failed.');
+    error.conflict = response.status === 409;
+    throw error;
+  }
   return response.json();
 };
 
@@ -136,6 +145,7 @@ export async function prepareProfileStorage({
   cancelSchedule = globalThis.clearTimeout?.bind(globalThis),
   eventTarget = globalThis,
   syncDelay = 250,
+  onStatus = () => {},
 }) {
   const name = normaliseProfileName(profile?.name);
   if (!name || !storage) throw new TypeError('A valid profile and storage are required.');
@@ -144,41 +154,70 @@ export async function prepareProfileStorage({
   let generation = 0;
   let timer = null;
   let syncing = null;
+  let revision;
+  let conflict = false;
 
   const saveMeta = (dirty) => {
-    meta = { initialised: true, dirty: dirty === true };
+    meta = { initialised: true, dirty: dirty === true, revision };
     safeSet(metaStorage, metaKey, JSON.stringify(meta));
   };
 
   if (fetchImpl) {
     try {
       const remote = await requestProfile(fetchImpl, name);
+      revision = remote.revision;
       if (!meta?.initialised) {
         const merged = writeProfileState(storage, mergeProfileStates(readProfileState(storage), remote.state));
-        await saveRemoteState(fetchImpl, name, merged);
+        saveMeta(true);
+        const saved = await saveRemoteState(fetchImpl, name, merged, revision);
+        revision = saved.revision;
         saveMeta(false);
       } else if (meta.dirty) {
-        await saveRemoteState(fetchImpl, name, readProfileState(storage));
+        // A stale offline snapshot must never erase another device's additions.
+        const merged = writeProfileState(storage, mergeProfileStates(readProfileState(storage), remote.state));
+        const saved = await saveRemoteState(fetchImpl, name, merged, revision);
+        revision = saved.revision;
         saveMeta(false);
       } else {
         writeProfileState(storage, remote.state);
         saveMeta(false);
       }
-    } catch {
+      onStatus('saved');
+    } catch (error) {
+      revision = undefined;
+      conflict = error.conflict === true;
+      onStatus(conflict ? 'conflict' : 'offline');
       // Existing local data keeps the app usable offline; the next write retries sync.
     }
   }
 
   const syncNow = async ({ keepalive = false } = {}) => {
-    if (!fetchImpl || !meta?.dirty) return false;
+    if (!fetchImpl || !meta?.dirty || conflict) return false;
+    if (revision === undefined) {
+      // Reconnect without blindly replacing data written while this device was offline.
+      try {
+        const remote = await requestProfile(fetchImpl, name);
+        if (meta?.revision !== remote.revision) {
+          conflict = true; onStatus('conflict'); return false;
+        }
+        revision = remote.revision;
+      } catch { onStatus('offline'); return false; }
+    }
     if (syncing) return syncing;
     const savingGeneration = generation;
-    syncing = saveRemoteState(fetchImpl, name, readProfileState(storage), keepalive)
-      .then(() => {
+    onStatus('saving');
+    syncing = saveRemoteState(fetchImpl, name, readProfileState(storage), revision, keepalive)
+      .then((saved) => {
+        revision = saved.revision;
         if (generation === savingGeneration) saveMeta(false);
+        onStatus('saved');
         return true;
       })
-      .catch(() => false)
+      .catch((error) => {
+        conflict = error.conflict === true;
+        onStatus(conflict ? 'conflict' : 'offline');
+        return false;
+      })
       .finally(() => {
         syncing = null;
         if (meta?.dirty && generation !== savingGeneration) queueSync();
@@ -189,6 +228,7 @@ export async function prepareProfileStorage({
   const queueSync = () => {
     generation += 1;
     saveMeta(true);
+    onStatus(conflict ? 'conflict' : 'saving');
     if (!schedule) return;
     if (timer !== null && cancelSchedule) cancelSchedule(timer);
     timer = schedule(() => {
@@ -211,5 +251,9 @@ export async function prepareProfileStorage({
   });
 
   eventTarget?.addEventListener?.('pagehide', () => syncNow({ keepalive: true }));
+  eventTarget?.addEventListener?.('online', () => syncNow());
+  eventTarget?.addEventListener?.('visibilitychange', () => {
+    if (globalThis.document?.visibilityState === 'visible') syncNow();
+  });
   return syncedStorage;
 }

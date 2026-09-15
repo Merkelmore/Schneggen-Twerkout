@@ -26,6 +26,15 @@ test('normalises weekday assignments and a unique rotation', () => {
   assert.equal(plan.updatedAt, '2026-09-04T08:00:00.000Z');
 });
 
+test('an intentionally cleared newer plan does not resurrect older choices', () => {
+  const merged = mergeWorkoutPlans(
+    { weekdays: { 1: 'legs' }, updatedAt: '2026-09-14T10:00:00Z' },
+    { weekdays: {}, rotation: [], updatedAt: '2026-09-15T10:00:00Z' },
+  );
+  assert.deepEqual(merged.weekdays, {});
+  assert.deepEqual(merged.rotation, []);
+});
+
 test('removes deleted preset IDs from a saved plan', () => {
   const plan = reconcileWorkoutPlan({
     weekdays: { 1: 'upper', 2: 'gone' },

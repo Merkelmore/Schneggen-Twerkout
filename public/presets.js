@@ -33,6 +33,7 @@ export const normalisePresetExercise = (input) => {
   const sets = suppliedSets.slice(0, MAX_PRESET_SETS).map(normalisePlannedSet);
 
   return {
+    ...(input?.id ? { id: String(input.id).slice(0, 80) } : {}),
     name,
     sets: sets.length ? sets : [normalisePlannedSet()],
   };
@@ -42,7 +43,10 @@ export const normalisePreset = (input = {}) => {
   const name = String(input.name ?? '').trim().replace(/\s+/g, ' ').slice(0, 60);
   const seen = new Set();
   const exercises = (Array.isArray(input.exercises) ? input.exercises : [])
-    .map(normalisePresetExercise)
+    .map((exercise, index) => {
+      const clean = normalisePresetExercise(exercise);
+      return clean ? { ...clean, id: clean.id || `exercise-${index + 1}` } : null;
+    })
     .filter((exercise) => {
       if (!exercise) return false;
       const key = exercise.name.toLocaleLowerCase();
@@ -92,10 +96,12 @@ export const createStarterPresets = () => normalisePresets([
 
 const exerciseKey = (value) => cleanExerciseName(value).toLocaleLowerCase();
 
-export const latestExerciseSet = (records, exercise) => {
+export const latestExerciseSet = (records, exercise, identity = {}) => {
   const key = exerciseKey(exercise);
   return (Array.isArray(records) ? records : [])
-    .filter((record) => exerciseKey(record.exercise) === key)
+    .filter((record) => exerciseKey(record.exercise) === key || (
+      identity.id && identity.presetId && record.workoutExerciseId === identity.id && record.presetId === identity.presetId
+    ))
     .reduce((latest, record) => (
       !latest || new Date(record.date).getTime() > new Date(latest.date).getTime()
         ? record
@@ -123,10 +129,12 @@ export const startWorkout = (preset, records, now = new Date()) => {
     name: cleanPreset.name,
     startedAt: new Date(now).toISOString(),
     updatedAt: new Date(now).toISOString(),
+    selectedExerciseId: cleanPreset.exercises[0].id,
     exercises: cleanPreset.exercises.map((exercise) => ({
+      id: exercise.id,
       name: exercise.name,
       plannedSets: exercise.sets.map(normalisePlannedSet),
-      previous: previousSnapshot(latestExerciseSet(records, exercise.name)),
+      previous: previousSnapshot(latestExerciseSet(records, exercise.name, { id: exercise.id, presetId: cleanPreset.id })),
       completedSetIds: [],
     })),
   };
@@ -136,13 +144,14 @@ export const normaliseActiveWorkout = (input = {}) => {
   if (!input || !Array.isArray(input.exercises)) return null;
   const name = String(input.name ?? '').trim().slice(0, 60);
   const exercises = input.exercises
-    .map((exercise) => {
+    .map((exercise, index) => {
       const normalised = normalisePresetExercise({
         name: exercise?.name,
         sets: exercise?.plannedSets ?? exercise?.sets,
       });
       if (!normalised) return null;
       return {
+        id: String(exercise.id || `exercise-${index + 1}`).slice(0, 80),
         name: normalised.name,
         plannedSets: normalised.sets,
         previous: exercise?.previous && typeof exercise.previous === 'object'
@@ -168,18 +177,24 @@ export const normaliseActiveWorkout = (input = {}) => {
     name,
     startedAt: Number.isNaN(startedAt.getTime()) ? new Date().toISOString() : startedAt.toISOString(),
     updatedAt: Number.isNaN(updatedAt.getTime()) ? new Date().toISOString() : updatedAt.toISOString(),
+    selectedExerciseId: exercises.some(({ id }) => id === input.selectedExerciseId)
+      ? input.selectedExerciseId
+      : (exercises.find((exercise) => exercise.completedSetIds.length < exercise.plannedSets.length) || exercises[0]).id,
     exercises,
   };
 };
 
 export const markExerciseDone = (activeWorkout, record) => {
   const active = normaliseActiveWorkout(activeWorkout);
-  if (!active || !record?.id) return activeWorkout;
+  if (!active || !record?.id || record.workoutId !== active.id) return activeWorkout;
 
   const key = exerciseKey(record.exercise);
   let changed = false;
   const exercises = active.exercises.map((exercise) => {
-    if (exerciseKey(exercise.name) !== key || exercise.completedSetIds.includes(record.id)) {
+    const matches = record.workoutExerciseId
+      ? exercise.id === record.workoutExerciseId
+      : exerciseKey(exercise.name) === key;
+    if (!matches || exercise.completedSetIds.includes(record.id)) {
       return exercise;
     }
     changed = true;
@@ -194,6 +209,32 @@ export const markExerciseDone = (activeWorkout, record) => {
     updatedAt: new Date().toISOString(),
     exercises,
   } : activeWorkout;
+};
+
+// Apply edits by stable exercise ID. Recorded sets and their IDs are never rewritten.
+export const reviseActiveWorkout = (input, preset, records = []) => {
+  const active = normaliseActiveWorkout(input);
+  const clean = normalisePreset(preset);
+  if (!active || !clean) throw new TypeError('Add a name and an exercise.');
+  const exercises = clean.exercises.map((exercise) => {
+    const previous = active.exercises.find(({ id }) => id === exercise.id);
+    if (previous && exercise.sets.length < previous.completedSetIds.length) {
+      throw new TypeError('Keep the sets already logged.');
+    }
+    return {
+      id: exercise.id,
+      name: exercise.name,
+      plannedSets: exercise.sets,
+      completedSetIds: previous?.completedSetIds || [],
+      previous: previous?.previous || previousSnapshot(latestExerciseSet(records, exercise.name)),
+    };
+  });
+  for (const exercise of active.exercises) {
+    if (exercise.completedSetIds.length && !exercises.some(({ id }) => id === exercise.id)) {
+      throw new TypeError('Keep exercises with logged sets.');
+    }
+  }
+  return normaliseActiveWorkout({ ...active, name: clean.name, exercises, updatedAt: new Date().toISOString() });
 };
 
 export const parsePresetBackup = (text) => {

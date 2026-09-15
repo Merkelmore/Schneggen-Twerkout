@@ -18,6 +18,10 @@ The shared `production-data-backup` job uses SQLite's online backup command, ver
 
 ## Release
 
+Release 1.7 uses additive JSON fields only: stable exercise IDs, selected exercise and temporary profile feedback. It does not migrate, reset or replace the SQLite database or named volume. Compare hashes of every stored profile state before and after container replacement, not only Petra's set count. Feedback is append-preserved and included in JSON backups; removing the temporary UI later must not delete stored feedback.
+
+Updated clients send the loaded profile revision with every save. Stale or old unversioned clients receive HTTP 409 instead of overwriting another device's state. Reload updates old offline assets; unsynced local data remains in the browser and is combined on reload (local values win for identical IDs). The sync status shows offline/conflicting writes. No automatic deletion or database reset is used to resolve conflicts.
+
 1. Test the exact Git revision with `npm test`, an API/database smoke test, and a container health check.
 2. Build the image with the short Git revision as its immutable tag.
 3. Deploy only the `schneggen-twerkout` Compose project on the shared network.
@@ -27,6 +31,8 @@ The shared `production-data-backup` job uses SQLite's online backup command, ver
 ## Rollback
 
 Retain the preceding image, release directory, and SQLite volume. Set `APP_REVISION` to the preceding verified revision, recreate only this Compose project, and verify the same health and public checks. The earlier static revision ignores but does not delete the server database. A DNS rollback removes only the `schnegge` record; it must not alter the apex, mail, analytics, or TXT records on `strotzenheim.com`.
+
+Before reverting to pre-1.7 code, take a fresh online backup of all profile JSON, including feedback and exercise IDs. That older server can drop unknown JSON fields on its next profile save; retain the fresh backup for a merge-only recovery/re-promotion. Never restore an old backup over newly logged workouts. Prefer re-promotion after fixing forward, and preserve both backups and the current volume.
 
 ## Owner actions
 

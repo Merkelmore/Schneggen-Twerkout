@@ -110,7 +110,11 @@ export function createApplicationServer({ databasePath, publicDirectory }) {
       const profileName = profileStatePath(url.pathname);
       if (request.method === 'PUT' && profileName) {
         const body = await readJson(request);
-        sendJson(response, 200, saveProfileState(database, profileName, body.state));
+        if (!Number.isSafeInteger(body.expectedRevision)) {
+          sendJson(response, 409, { error: 'Reload the app before syncing. Your local data is kept.' });
+          return;
+        }
+        sendJson(response, 200, saveProfileState(database, profileName, body.state, body.expectedRevision));
         return;
       }
 
@@ -121,7 +125,9 @@ export function createApplicationServer({ databasePath, publicDirectory }) {
 
       sendJson(response, 404, { error: 'Not found.' });
     } catch (error) {
-      if (error instanceof TypeError || error instanceof SyntaxError) {
+      if (error.status === 409) {
+        sendJson(response, 409, { error: error.message });
+      } else if (error instanceof TypeError || error instanceof SyntaxError) {
         sendJson(response, 400, { error: error.message || 'Invalid request.' });
       } else if (error instanceof RangeError) {
         sendJson(response, 413, { error: error.message });

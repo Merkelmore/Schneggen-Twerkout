@@ -12,6 +12,10 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - searchable workout presets with ordered exercises, planned set/weight/rep rows, three starter routines, and set-by-set progress;
 - per-profile workout plans using weekday assignments or a repeating preset order, with a suggested one-tap start card;
 - last-time weight and reps shown and prefilled when an exercise is opened from a workout;
+- persistent workout title and overview from the first set, with any-order exercise selection;
+- rename exercises and drag to reorder using mouse, touch or pen; arrow buttons support keyboards;
+- edit running workouts, add missed sets, or save changes back to the preset without rewriting logged sets;
+- temporary UAT checklist and free-form feedback, saved centrally in each profile and included in backups;
 - server-backed name profiles with a pre-created Petra profile and separate workout spaces;
 - SQLite storage with a browser-local offline cache and merge-safe JSON import/export;
 - installable, offline-capable phone experience;
@@ -28,6 +32,8 @@ SCHNEGGEN_DB_PATH=./schneggen.sqlite npm start
 ```
 
 Open `http://localhost:8080` and check `http://localhost:8080/healthz`.
+
+For browser acceptance tests, set `SCHNEGGEN_PLAYWRIGHT_MODULE` to a local Playwright module and optionally `SCHNEGGEN_BROWSER_PATH` to a browser executable, then run `node scripts/ui-smoke.mjs`. It creates a disposable local database, not production data.
 
 ## Privacy and backups
 

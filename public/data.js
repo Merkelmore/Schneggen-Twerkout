@@ -1,5 +1,5 @@
 export const STORAGE_KEY = 'schneggen-workouts-v1';
-export const BACKUP_VERSION = 3;
+export const BACKUP_VERSION = 4;
 
 export const WORKOUT_TYPES = {
   strength: {
@@ -74,6 +74,7 @@ export const normaliseRecord = (input = {}) => {
     distance: cleanNumber(input.distance, { min: 0.01, max: 100_000 }),
     notes: String(input.notes ?? '').trim().slice(0, 240),
     workoutId: String(input.workoutId ?? '').trim().slice(0, 80),
+    ...(input.workoutExerciseId ? { workoutExerciseId: String(input.workoutExerciseId).slice(0, 80) } : {}),
     presetId: String(input.presetId ?? '').trim().slice(0, 80),
     workoutName: String(input.workoutName ?? '').trim().replace(/\s+/g, ' ').slice(0, 60),
     workoutStartedAt: parsedWorkoutStartedAt && !Number.isNaN(parsedWorkoutStartedAt.getTime())
@@ -231,13 +232,15 @@ export const todaySummary = (records, now = new Date()) => {
   };
 };
 
-export const serialiseBackup = (records, { presets = [], workoutPlan = null } = {}) => JSON.stringify({
+export const serialiseBackup = (records, { presets = [], workoutPlan = null, feedback = [], activeWorkout = null } = {}) => JSON.stringify({
   app: 'Schneggen-Twerkout',
   version: BACKUP_VERSION,
   exportedAt: new Date().toISOString(),
   records: sortRecords(records),
   presets,
   workoutPlan,
+  feedback,
+  activeWorkout,
 }, null, 2);
 
 export const parseBackup = (text) => {

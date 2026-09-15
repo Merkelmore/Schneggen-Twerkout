@@ -13,6 +13,7 @@ import {
   parseWorkoutPlanBackup,
 } from '../public/plans.js';
 import { normaliseProfileName } from '../public/profiles.js';
+import { mergeFeedback, normaliseFeedback } from '../public/feedback.js';
 
 const MAX_RECORDS = 50_000;
 const MAX_PRESETS = 100;
@@ -25,6 +26,7 @@ export const initialProfileState = () => ({
   workoutPlan: normaliseWorkoutPlan(),
   activeWorkout: null,
   firstVisitSeen: false,
+  feedback: [],
 });
 
 export const normaliseServerState = (input = {}) => {
@@ -43,6 +45,7 @@ export const normaliseServerState = (input = {}) => {
     workoutPlan: normaliseWorkoutPlan(value.workoutPlan),
     activeWorkout: normaliseActiveWorkout(value.activeWorkout),
     firstVisitSeen: value.firstVisitSeen === true,
+    feedback: normaliseFeedback(value.feedback),
   };
 };
 
@@ -103,9 +106,16 @@ export function getOrCreateProfile(database, rawName) {
   };
 }
 
-export function saveProfileState(database, rawName, input) {
+export function saveProfileState(database, rawName, input, expectedRevision) {
   const current = getOrCreateProfile(database, rawName);
-  const state = normaliseServerState(input);
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new TypeError('A profile state is required.');
+  if (expectedRevision !== undefined && expectedRevision !== current.revision) {
+    const error = new Error('This profile changed on another device. Reload to combine changes.');
+    error.status = 409;
+    throw error;
+  }
+  const state = normaliseServerState({ ...current.state, ...input });
+  state.feedback = mergeFeedback(current.state.feedback, state.feedback);
   const updatedAt = new Date().toISOString();
   database.prepare(`
     UPDATE profiles
@@ -130,6 +140,7 @@ export function importProfileBackup(database, rawName, text) {
     workoutPlan: importedPlan
       ? mergeWorkoutPlans(current.state.workoutPlan, importedPlan)
       : current.state.workoutPlan,
+    feedback: mergeFeedback(current.state.feedback, JSON.parse(text)?.feedback),
   });
 }
 

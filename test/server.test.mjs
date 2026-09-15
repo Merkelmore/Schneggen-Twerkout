@@ -130,10 +130,17 @@ test('HTTP service stores profile state and serves the secured app', async (cont
   const updated = await fetch(`${base}/api/profiles/Leon/state`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ state: { records: [makeRecord({ id: 'api-set' })], presets: [] } }),
+    body: JSON.stringify({ expectedRevision: 1, state: { records: [makeRecord({ id: 'api-set' })], presets: [] } }),
   });
   assert.equal(updated.status, 200);
   assert.equal((await updated.json()).state.records[0].id, 'api-set');
+  for (const expectedRevision of [1, undefined]) {
+    const stale = await fetch(`${base}/api/profiles/Leon/state`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expectedRevision, state: { records: [] } }),
+    });
+    assert.equal(stale.status, 409);
+  }
 
   const loaded = await fetch(`${base}/api/profiles`, {
     method: 'POST',

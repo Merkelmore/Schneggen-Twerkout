@@ -97,3 +97,38 @@ test('synced storage hydrates once and pushes later writes', async () => {
   assert.equal(await synced.syncNow(), true);
   assert.equal(writes.at(-1).records[0].id, 'new');
 });
+
+test('stale writes keep the local copy and expose a conflict instead of replacing remote history', async () => {
+  const storage = memoryStorage();
+  const statuses = [];
+  let revision = 1;
+  let remote = { records: [record('original', 20)] };
+  const fetchImpl = async (url, options) => {
+    if (url === '/api/profiles') return { ok: true, json: async () => ({ state: remote, revision }) };
+    const body = JSON.parse(options.body);
+    if (body.expectedRevision !== revision) return { ok: false, status: 409 };
+    remote = body.state; revision += 1;
+    return { ok: true, json: async () => ({ revision }) };
+  };
+  const synced = await prepareProfileStorage({ profile: { name: 'Tester' }, storage, metaStorage: memoryStorage(), fetchImpl, schedule: null, eventTarget: null, onStatus: (status) => statuses.push(status) });
+  remote.records.push(record('other-device', 40)); revision += 1;
+  synced.setItem(STORAGE_KEY, JSON.stringify([record('original', 20), record('local', 30)]));
+  assert.equal(await synced.syncNow(), false);
+  assert.equal(statuses.at(-1), 'conflict');
+  assert.deepEqual(remote.records.map(({ id }) => id), ['original', 'other-device']);
+  assert.equal(readProfileState(storage).records.length, 2);
+});
+
+test('a dirty offline cache combines remote additions on reload', async () => {
+  const storage = memoryStorage({ [STORAGE_KEY]: JSON.stringify([record('offline', 10)]) });
+  const metaStorage = memoryStorage({ 'schneggen-server-sync-v1:tester': JSON.stringify({ initialised: true, dirty: true, revision: 1 }) });
+  let saved;
+  const fetchImpl = async (url, options) => {
+    if (url === '/api/profiles') return { ok: true, json: async () => ({ revision: 2, state: { records: [record('remote', 30)] } }) };
+    saved = JSON.parse(options.body);
+    return { ok: true, json: async () => ({ revision: 3 }) };
+  };
+  await prepareProfileStorage({ profile: { name: 'Tester' }, storage, metaStorage, fetchImpl, schedule: null, eventTarget: null });
+  assert.equal(saved.expectedRevision, 2);
+  assert.deepEqual(new Set(saved.state.records.map(({ id }) => id)), new Set(['offline', 'remote']));
+});

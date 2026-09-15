@@ -12,8 +12,9 @@ import {
   normalisePresetExercise,
   normalisePresets,
   parsePresetBackup,
+  reviseActiveWorkout,
   startWorkout,
-} from './presets.js?v=10';
+} from './presets.js?v=11';
 import {
   WEEKDAYS,
   WORKOUT_PLAN_STORAGE_KEY,
@@ -22,8 +23,9 @@ import {
   parseWorkoutPlanBackup,
   reconcileWorkoutPlan,
   suggestWorkoutPreset,
-} from './plans.js?v=10';
-import { swapRs } from './w-speech.js?v=10';
+} from './plans.js?v=11';
+import { swapRs } from './w-speech.js?v=11';
+import { attachReorderHandle } from './reorder.js?v=11';
 
 const EXERCISE_LIBRARY = [
   'Around the World',
@@ -50,7 +52,9 @@ const element = (tag, className, text) => {
 };
 
 const exerciseKey = (value) => cleanExerciseName(value).toLocaleLowerCase();
+const scrollBehavior = () => matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth';
 const cloneExercise = (exercise) => ({
+  id: exercise.id,
   name: exercise.name,
   sets: exercise.sets.map((set) => ({ ...set })),
 });
@@ -60,6 +64,7 @@ export function createWorkoutController({
   onLogExercise,
   onShowView,
   onToast,
+  onSessionChange = () => {},
   storage = globalThis.localStorage,
 }) {
   const firstVisitCard = document.querySelector('#firstVisitCard');
@@ -96,6 +101,7 @@ export function createWorkoutController({
   let rotationOrder = orderedPresetIds(planDraft);
   let draftExercises = [];
   let editingPresetId = null;
+  let editingWorkout = false;
   let firstVisit = read(FIRST_VISIT_STORAGE_KEY) !== 'seen';
 
   function read(key) {
@@ -371,6 +377,7 @@ export function createWorkoutController({
     const plannedSet = exercise.plannedSets[completed] ?? null;
     if (!plannedSet) return null;
     return {
+      exerciseId: exercise.id,
       name: exercise.name,
       previous: exercise.previous,
       plannedSet,
@@ -385,6 +392,8 @@ export function createWorkoutController({
 
   function renderActive() {
     activePanel.hidden = !active;
+    document.querySelector('#sessionBanner').hidden = !active;
+    document.querySelector('#appShell').classList.toggle('has-workout', Boolean(active));
     if (!active) return;
 
     const totalSets = active.exercises.reduce(
@@ -404,9 +413,14 @@ export function createWorkoutController({
       const planned = exercise.plannedSets.length;
       const completed = Math.min(exercise.completedSetIds.length, planned);
       const isDone = completed >= planned;
+      const card = element('div', 'session-exercise');
+      card.dataset.reorderRow = exercise.id;
       const row = element('button', 'workout-exercise-row');
       row.type = 'button';
       if (isDone) row.classList.add('is-done');
+      const isCurrent = active.selectedExerciseId === exercise.id && !isDone;
+      if (isCurrent) row.classList.add('is-current');
+      row.setAttribute('aria-pressed', String(isCurrent));
 
       const status = element('span', 'workout-exercise-status', isDone ? '✓' : '○');
       status.setAttribute('aria-hidden', 'true');
@@ -417,21 +431,69 @@ export function createWorkoutController({
         element(
           'small',
           null,
-          exercise.previous ? `Last time: ${formatRecord(exercise.previous)}` : 'No previous set yet',
+          isDone ? 'Done' : isCurrent ? 'Current exercise' : completed ? 'Continue anytime' : 'Up next · tap to switch',
         ),
       );
 
       const count = element('span', 'workout-set-count', `${completed}/${planned} sets`);
       row.append(status, copy, count);
-      row.disabled = isDone;
       row.addEventListener('click', () => {
+        if (isDone) {
+          onToast('All planned sets logged. Use + Set to add another.');
+          return;
+        }
         const context = exerciseContext(exercise);
         if (!context) return;
+        active.selectedExerciseId = exercise.id;
+        active.updatedAt = new Date().toISOString();
+        saveActive();
         markWelcomeSeen();
+        renderActive();
         onLogExercise(context);
       });
-      activeList.append(row);
+      const controls = element('div', 'session-exercise-controls');
+      const handle = element('button', 'mini-button drag-handle', '⠿');
+      handle.type = 'button';
+      handle.setAttribute('aria-label', `Drag ${exercise.name}`);
+      attachReorderHandle(handle, card, activeList, moveActiveExercise);
+      const add = element('button', 'mini-button', '+ Set');
+      add.type = 'button';
+      add.setAttribute('aria-label', `Add set to ${exercise.name}`);
+      add.disabled = planned >= MAX_PRESET_SETS;
+      add.addEventListener('click', () => {
+        exercise.plannedSets.push({ ...exercise.plannedSets.at(-1) });
+        active.updatedAt = new Date().toISOString();
+        saveActive(); renderActive();
+        if (isDone) {
+          active.selectedExerciseId = exercise.id;
+          saveActive(); renderActive();
+          onSessionChange(exerciseContext(exercise));
+        }
+      });
+      const index = active.exercises.indexOf(exercise);
+      for (const [offset, label, symbol] of [[-1, 'up', '↑'], [1, 'down', '↓']]) {
+        const button = element('button', 'mini-button', symbol);
+        button.type = 'button';
+        button.disabled = index + offset < 0 || index + offset >= active.exercises.length;
+        button.setAttribute('aria-label', `Move ${exercise.name} ${label}`);
+        button.addEventListener('click', () => moveActiveExercise(index, index + offset));
+        controls.append(button);
+      }
+      controls.prepend(handle);
+      controls.append(add);
+      card.append(row, controls);
+      const logged = records.filter(({ id }) => exercise.completedSetIds.includes(id));
+      if (logged.length) card.append(element('p', 'session-logged', logged.slice().reverse().map(formatRecord).join(' · ')));
+      activeList.append(card);
     });
+  }
+
+  function moveActiveExercise(from, to) {
+    const [exercise] = active.exercises.splice(from, 1);
+    active.exercises.splice(to, 0, exercise);
+    active.updatedAt = new Date().toISOString();
+    saveActive(); renderActive();
+    onToast('Workout order updated.');
   }
 
   function updateDraftSet(exerciseIndex, setIndex, field, value) {
@@ -455,8 +517,10 @@ export function createWorkoutController({
   function moveDraftExercise(index, offset) {
     const next = index + offset;
     if (next < 0 || next >= draftExercises.length) return;
-    [draftExercises[index], draftExercises[next]] = [draftExercises[next], draftExercises[index]];
+    const [exercise] = draftExercises.splice(index, 1);
+    draftExercises.splice(next, 0, exercise);
     renderDraft();
+    presetDraftList.children[next]?.querySelector('.drag-handle')?.focus({ preventScroll: true });
   }
 
   function renderDraft() {
@@ -468,8 +532,21 @@ export function createWorkoutController({
 
     draftExercises.forEach((exercise, exerciseIndex) => {
       const card = element('section', 'draft-exercise');
+      card.dataset.reorderRow = exercise.id;
       const heading = element('div', 'draft-exercise-heading');
-      heading.append(element('strong', null, `${exerciseIndex + 1}. ${exercise.name}`));
+      const handle = element('button', 'mini-button drag-handle', '⠿');
+      handle.type = 'button';
+      handle.setAttribute('aria-label', `Drag ${exercise.name}`);
+      attachReorderHandle(handle, card, presetDraftList, (from, to) => moveDraftExercise(from, to - from));
+      const name = document.createElement('input');
+      name.value = exercise.name;
+      name.maxLength = 80;
+      name.required = true;
+      name.className = 'draft-exercise-name';
+      name.setAttribute('aria-label', `Exercise ${exerciseIndex + 1} name`);
+      name.addEventListener('input', () => { exercise.name = name.value; name.setCustomValidity(''); });
+      heading.append(handle, name);
+      const loggedCount = editingWorkout ? active.exercises.find(({ id }) => id === exercise.id)?.completedSetIds.length || 0 : 0;
 
       const actions = element('div', 'draft-exercise-actions');
       const up = element('button', 'mini-button', '↑');
@@ -484,6 +561,8 @@ export function createWorkoutController({
       down.addEventListener('click', () => moveDraftExercise(exerciseIndex, 1));
       const remove = element('button', 'mini-button', '×');
       remove.type = 'button';
+      remove.disabled = loggedCount > 0;
+      remove.title = loggedCount ? 'This exercise has logged sets.' : '';
       remove.setAttribute('aria-label', `Remove ${exercise.name}`);
       remove.addEventListener('click', () => {
         draftExercises.splice(exerciseIndex, 1);
@@ -511,13 +590,18 @@ export function createWorkoutController({
         );
         const removeSet = element('button', 'mini-button planned-set-remove', '×');
         removeSet.type = 'button';
-        removeSet.disabled = exercise.sets.length === 1;
+        removeSet.disabled = exercise.sets.length === 1 || setIndex < loggedCount;
         removeSet.setAttribute('aria-label', `Remove ${exercise.name} set ${setIndex + 1}`);
         removeSet.addEventListener('click', () => {
           if (exercise.sets.length === 1) return;
           exercise.sets.splice(setIndex, 1);
           renderDraft();
         });
+        if (setIndex < loggedCount) {
+          row.classList.add('is-logged');
+          row.querySelectorAll('input').forEach((input) => { input.disabled = true; });
+          row.querySelector('.planned-set-number').textContent = '✓';
+        }
         row.append(removeSet);
         setList.append(row);
       });
@@ -531,7 +615,7 @@ export function createWorkoutController({
         }
         exercise.sets.push(normalisePlannedSet());
         renderDraft();
-        card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        presetDraftList.children[exerciseIndex]?.scrollIntoView({ behavior: scrollBehavior(), block: 'nearest' });
       });
 
       card.append(heading, setHead, setList, addSet);
@@ -581,29 +665,36 @@ export function createWorkoutController({
     renderPresets();
     renderActive();
     if (!presetEditor.hidden) {
-      renderDraft();
       renderSuggestions();
     }
   }
 
-  function openEditor(preset = null) {
+  function openEditor(preset = null, forWorkout = false) {
     markWelcomeSeen();
+    editingWorkout = forWorkout;
+    onShowView('workouts');
     editingPresetId = preset?.id || null;
-    presetEditorTitle.textContent = preset ? 'Edit preset' : 'New preset';
+    presetEditorTitle.textContent = forWorkout ? 'Edit workout' : preset ? 'Edit preset' : 'New preset';
+    document.querySelector('#presetSaveScopeField').hidden = !forWorkout;
+    document.querySelector('#presetSaveScope').value = 'workout';
+    document.querySelector('#presetSaveLabel').textContent = forWorkout ? 'Save changes' : 'Save preset';
     presetNameInput.value = preset?.name || '';
     presetExerciseInput.value = '';
     draftExercises = (preset?.exercises || []).map(cloneExercise);
     presetEditor.hidden = false;
+    document.querySelector('#appShell').classList.add('is-editing-preset');
     renderDraft();
     renderSuggestions();
-    presetEditor.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    presetNameInput.focus();
+    presetNameInput.focus({ preventScroll: true });
+    presetEditor.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
   }
 
   function closeEditor() {
     presetEditor.hidden = true;
+    document.querySelector('#appShell').classList.remove('is-editing-preset');
     presetExerciseSuggestions.hidden = true;
     editingPresetId = null;
+    editingWorkout = false;
     draftExercises = [];
     presetForm.reset();
   }
@@ -622,7 +713,7 @@ export function createWorkoutController({
       onToast('A preset can hold up to 20 exercises.');
       return;
     }
-    draftExercises.push(exercise);
+    draftExercises.push({ ...exercise, id: crypto.randomUUID() });
     presetExerciseInput.value = '';
     renderDraft();
     renderSuggestions();
@@ -631,9 +722,14 @@ export function createWorkoutController({
 
   function savePreset(event) {
     event.preventDefault();
+    const names = draftExercises.map(({ name }) => exerciseKey(name));
+    if (names.some((name) => !name) || new Set(names).size !== names.length) {
+      onToast('Give each exercise a different name.');
+      return;
+    }
     const existing = presets.find((preset) => preset.id === editingPresetId);
     const preset = normalisePreset({
-      id: existing?.id,
+      id: editingWorkout ? active.presetId : existing?.id,
       name: presetNameInput.value,
       exercises: draftExercises,
       createdAt: existing?.createdAt,
@@ -645,10 +741,27 @@ export function createWorkoutController({
       return;
     }
 
+    if (editingWorkout) {
+      try { active = reviseActiveWorkout(active, preset, records); }
+      catch (error) { onToast(error.message); return; }
+      saveActive();
+      if (document.querySelector('#presetSaveScope').value === 'both') {
+        presets = existing ? presets.map((item) => item.id === existing.id ? preset : item) : [preset, ...presets];
+        savePresets(); resetPlanDraft();
+      }
+      closeEditor(); render();
+      const context = getSelectedContext();
+      onSessionChange(context);
+      onShowView('log');
+      onToast('Workout updated. Logged sets kept.');
+      return;
+    }
+
     presets = existing
       ? presets.map((item) => item.id === existing.id ? preset : item)
       : [preset, ...presets];
     savePresets();
+    resetPlanDraft();
     closeEditor();
     render();
     onToast(existing ? 'Preset updated.' : 'Preset saved.');
@@ -675,7 +788,7 @@ export function createWorkoutController({
     markWelcomeSeen();
     closeEditor();
     render();
-    onShowView('workouts');
+    onLogExercise(getSelectedContext());
     onToast('Workout started 🐌');
   }
 
@@ -683,6 +796,7 @@ export function createWorkoutController({
     if (!active || !window.confirm(swapRs(`Finish the ${active.name} workout?`))) return;
     active = null;
     saveActive();
+    onSessionChange(null);
     render();
     onToast('Workout finished.');
   }
@@ -694,8 +808,37 @@ export function createWorkoutController({
     active = updated;
     saveActive();
     render();
-    const exercise = active.exercises.find((item) => exerciseKey(item.name) === exerciseKey(record.exercise));
+    const exercise = active.exercises.find((item) => record.workoutExerciseId ? item.id === record.workoutExerciseId : exerciseKey(item.name) === exerciseKey(record.exercise));
+    if (exercise && exerciseContext(exercise)) return exerciseContext(exercise);
+    const next = active.exercises.find((item) => item.completedSetIds.length < item.plannedSets.length);
+    if (next) { active.selectedExerciseId = next.id; saveActive(); renderActive(); }
+    return next ? exerciseContext(next) : null;
+  }
+
+  function recordRemoved(id) {
+    if (!active) return;
+    active.exercises.forEach((exercise) => {
+      exercise.completedSetIds = exercise.completedSetIds.filter((savedId) => savedId !== id);
+      exercise.done = exercise.completedSetIds.length >= exercise.plannedSets.length;
+    });
+    active.updatedAt = new Date().toISOString();
+    saveActive();
+    onSessionChange(getSelectedContext());
+  }
+
+  function getSelectedContext() {
+    if (!active) return null;
+    let exercise = active.exercises.find(({ id }) => id === active.selectedExerciseId);
+    if (!exercise || !exerciseContext(exercise)) {
+      exercise = active.exercises.find((item) => item.completedSetIds.length < item.plannedSets.length);
+      if (exercise) { active.selectedExerciseId = exercise.id; saveActive(); renderActive(); }
+    }
     return exercise ? exerciseContext(exercise) : null;
+  }
+
+  function editRunningWorkout() {
+    if (!active) return;
+    openEditor({ id: active.presetId, name: active.name, exercises: active.exercises.map((exercise) => ({ ...exercise, sets: exercise.plannedSets })) }, true);
   }
 
   function previewImport(text) {
@@ -716,6 +859,8 @@ export function createWorkoutController({
     ];
     savePresets();
     const importedPlan = parseWorkoutPlanBackup(text);
+    const importedActive = normaliseActiveWorkout(JSON.parse(text)?.activeWorkout);
+    if (!active && importedActive) { active = importedActive; saveActive(); }
     if (importedPlan) {
       workoutPlan = reconcileWorkoutPlan(
         mergeWorkoutPlans(workoutPlan, importedPlan),
@@ -733,6 +878,11 @@ export function createWorkoutController({
   document.querySelector('#cancelPresetButton').addEventListener('click', closeEditor);
   document.querySelector('#addPresetExerciseButton').addEventListener('click', () => addDraftExercise());
   document.querySelector('#finishWorkoutButton').addEventListener('click', finishWorkout);
+  document.querySelector('#editWorkoutButton').addEventListener('click', editRunningWorkout);
+  document.querySelector('#sessionOverviewButton').addEventListener('click', () => {
+    onShowView('log');
+    activePanel.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+  });
   document.querySelector('#dismissFirstVisitButton').addEventListener('click', markWelcomeSeen);
   startSuggestedButton.addEventListener('click', () => {
     const suggestion = currentSuggestion();
@@ -757,6 +907,8 @@ export function createWorkoutController({
   presetForm.addEventListener('submit', savePreset);
 
   return Object.freeze({
+    getActiveWorkout: () => normaliseActiveWorkout(active),
+    getSelectedContext,
     getPresets: () => presets.map((preset) => ({
       ...preset,
       exercises: preset.exercises.map(cloneExercise),
@@ -767,6 +919,7 @@ export function createWorkoutController({
     importFromBackup,
     previewImport,
     recordSaved,
+    recordRemoved,
     render,
     shouldShowFirstVisit: () => firstVisit,
   });
