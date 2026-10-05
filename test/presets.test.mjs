@@ -8,6 +8,7 @@ import {
   normaliseActiveWorkout,
   normalisePreset,
   parsePresetBackup,
+  presetExerciseFromHistory,
   reviseActiveWorkout,
   startWorkout,
 } from '../public/presets.js';
@@ -69,6 +70,32 @@ test('starter presets are immediately usable', () => {
 
 test('finds the newest exercise set without changing stored casing', () => {
   assert.equal(latestExerciseSet(records, 'HIP thrust').id, 'latest');
+});
+
+test('new preset exercises reuse each set from the latest session, without changing history', () => {
+  const history = [
+    { ...records[0], workoutId: 'old-workout', workoutSetIndex: 0 },
+    { ...records[1], workoutId: 'latest-workout', workoutSetIndex: 1, weight: 75, reps: 10 },
+    { ...records[1], id: 'first-slot', workoutId: 'latest-workout', workoutSetIndex: 0 },
+  ];
+  const original = structuredClone(history);
+  const exercise = presetExerciseFromHistory(' HIP thrust ', history);
+  assert.equal(exercise.name, 'HIP thrust');
+  assert.deepEqual(exercise.sets, [{ weight: 80, reps: 8 }, { weight: 75, reps: 10 }]);
+  exercise.sets[0].weight = 90;
+  assert.deepEqual(history, original);
+  assert.deepEqual(normalisePreset({ name: 'Existing', exercises: [{ name: 'Hip thrust', sets: [{ weight: 42, reps: 12 }] }] }).exercises[0].sets, [{ weight: 42, reps: 12 }]);
+});
+
+test('new exercise history supports legacy days, empty slots, reps-only and no history', () => {
+  assert.deepEqual(presetExerciseFromHistory('hip thrust', records).sets, [{ weight: 80, reps: 8 }]);
+  assert.deepEqual(presetExerciseFromHistory('Squat', []).sets, [{ weight: null, reps: null }]);
+  assert.equal(presetExerciseFromHistory(' ', records), null);
+  const reps = { ...records[1], exercise: 'Push-up', type: 'reps', weight: null, workoutId: 'last', workoutSetIndex: 1 };
+  assert.deepEqual(presetExerciseFromHistory('Push-up', [reps]).sets, [{ weight: null, reps: null }, { weight: null, reps: 8 }]);
+  const duration = { ...reps, type: 'duration', weight: 80, reps: 8, workoutSetIndex: 0 };
+  assert.deepEqual(presetExerciseFromHistory('Push-up', [duration]).sets, [{ weight: null, reps: null }]);
+  assert.deepEqual(presetExerciseFromHistory('Push-up', [reps], 'last').sets, [{ weight: null, reps: null }]);
 });
 
 test('starting a workout snapshots plans and last weight and reps', () => {

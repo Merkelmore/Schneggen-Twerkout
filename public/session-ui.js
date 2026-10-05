@@ -1,5 +1,5 @@
-import { TRAINING_STORAGE_KEY, normaliseTraining, mergeTraining, setSlots, restRemaining, workoutComparison } from './training.js?v=12';
-import { previousExerciseSets } from './presets.js?v=12';
+import { TRAINING_STORAGE_KEY, normaliseTraining, mergeTraining, setSlots, restRemaining, workoutComparison } from './training.js?v=13';
+import { previousExerciseSets } from './presets.js?v=13';
 
 const el = (tag, className, text) => {
   const node = document.createElement(tag);

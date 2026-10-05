@@ -143,6 +143,19 @@ export const previousExerciseSets = (records, exercise, identity = {}, excludeWo
   return Array.from({ length: Math.min(snapshots.length, MAX_PRESET_SETS) }, (_, index) => snapshots[index] || null);
 };
 
+// Only use this when adding a new exercise; saved targets stay user-controlled.
+export const presetExerciseFromHistory = (name, records, excludeWorkoutId = '') => {
+  const exercise = normalisePresetExercise(name);
+  if (!exercise) return null;
+  const previous = previousExerciseSets(records, exercise.name, {}, excludeWorkoutId);
+  return {
+    ...exercise,
+    sets: previous.length ? previous.map((set) => normalisePlannedSet(
+      set?.type === 'strength' || set?.type === 'reps' ? set : {},
+    )) : exercise.sets,
+  };
+};
+
 export const startWorkout = (preset, records, now = new Date()) => {
   const cleanPreset = normalisePreset(preset);
   if (!cleanPreset) return null;

@@ -18,6 +18,8 @@ The shared `production-data-backup` job uses SQLite's online backup command, ver
 
 ## Release
 
+Release 1.8.1 only changes the preset editor: newly added exercises are initialized from the current profile's latest exercise session. Existing preset targets and logged sets are not overwritten. No server code, database schema, backup format or persistence contract changes. Offline assets are versioned so a reload receives the fix.
+
 Release 1.8 uses additive JSON fields only: per-record set slot numbers, per-set previous-session snapshots and profile training settings (weight increment, optional rest deadline, unsaved row drafts and the latest completion summary). Backup format 5 includes these settings; older backups remain importable. It does not migrate, reset or replace the SQLite database or named volume. Compare hashes of every stored profile state before and after container replacement, not only Petra's set count. Feedback is append-preserved and included in JSON backups; removing the temporary UI later must not delete stored feedback. A cached 1.7 client omitting slot metadata cannot strip it from an existing server record.
 
 Updated clients send the loaded profile revision with every save. Stale or old unversioned clients receive HTTP 409 instead of overwriting another device's state. Reload updates old offline assets; unsynced local data remains in the browser and is combined on reload (local values win for identical IDs). The sync status shows offline/conflicting writes. No automatic deletion or database reset is used to resolve conflicts.

@@ -1260,6 +1260,13 @@ a:focus-visible,
   font-weight: 900;
 }
 
+.planned-set-previous {
+  grid-column: 2 / -1;
+  color: var(--ink-soft);
+  font-size: .72rem;
+  line-height: 1.4;
+}
+
 .add-planned-set {
   min-height: 38px;
   border: 0;

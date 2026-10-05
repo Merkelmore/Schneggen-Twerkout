@@ -9,12 +9,13 @@ import {
   normaliseActiveWorkout,
   normalisePlannedSet,
   normalisePreset,
-  normalisePresetExercise,
   normalisePresets,
   parsePresetBackup,
+  presetExerciseFromHistory,
+  previousExerciseSets,
   reviseActiveWorkout,
   startWorkout,
-} from './presets.js?v=12';
+} from './presets.js?v=13';
 import {
   WEEKDAYS,
   WORKOUT_PLAN_STORAGE_KEY,
@@ -23,11 +24,11 @@ import {
   parseWorkoutPlanBackup,
   reconcileWorkoutPlan,
   suggestWorkoutPreset,
-} from './plans.js?v=12';
+} from './plans.js?v=13';
 
-import { attachReorderHandle } from './reorder.js?v=12';
-import { createSessionUI } from './session-ui.js?v=12';
-import { setSlots } from './training.js?v=12';
+import { attachReorderHandle } from './reorder.js?v=13';
+import { createSessionUI } from './session-ui.js?v=13';
+import { setSlots } from './training.js?v=13';
 
 const EXERCISE_LIBRARY = [
   'Around the World',
@@ -553,6 +554,9 @@ export function createWorkoutController({
       );
 
       const setList = element('div', 'planned-set-list');
+      const previousSets = previousExerciseSets(records, exercise.name,
+        { id: exercise.id, presetId: editingWorkout ? active.presetId : editingPresetId },
+        editingWorkout ? active.id : '');
       exercise.sets.forEach((set, setIndex) => {
         const row = element('div', 'planned-set-row');
         row.append(
@@ -575,6 +579,9 @@ export function createWorkoutController({
           row.querySelector('.planned-set-number').textContent = '✓';
         }
         row.append(removeSet);
+        if (previousSets[setIndex]) {
+          row.append(element('span', 'planned-set-previous', `Last time: ${formatRecord(previousSets[setIndex])}`));
+        }
         setList.append(row);
       });
 
@@ -672,7 +679,7 @@ export function createWorkoutController({
   }
 
   function addDraftExercise(value = presetExerciseInput.value) {
-    const exercise = normalisePresetExercise(value);
+    const exercise = presetExerciseFromHistory(value, records, editingWorkout ? active.id : '');
     if (!exercise) {
       onToast('Type an exercise first.');
       return;
