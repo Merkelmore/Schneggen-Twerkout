@@ -112,6 +112,39 @@ try {
   await waitSaved();
   const history = (await state()).records;
   await page.locator('[data-view="workouts"]').click();
+  // Adding from search reuses every last-session row, not a single best/latest set.
+  await page.locator('#newPresetButton').click();
+  await page.locator('#presetNameInput').fill('History preset UAT');
+  await page.locator('#presetExerciseInput').fill('Smith');
+  await page.locator('.exercise-suggestion').filter({ hasText: 'Smith squat' }).click();
+  assert.equal(await page.locator('.planned-set-row').count(), 3);
+  assert.deepEqual(await page.locator('.planned-set-previous').allTextContents(), ['Last time: 25 kg × 8', 'Last time: 25 kg × 9', 'Last time: 30 kg × 8']);
+  assert.deepEqual(await page.locator('.planned-set-row input').evaluateAll((inputs) => inputs.map((input) => input.value)), ['25', '8', '25', '9', '30', '8']);
+  await page.locator('.planned-set-row input').first().fill('42');
+  await page.locator('#presetExerciseInput').fill('Brand new exercise');
+  await page.locator('#addPresetExerciseButton').click();
+  assert.deepEqual(await page.locator('.draft-exercise').last().locator('input[type="number"]').evaluateAll((inputs) => inputs.map((input) => input.value)), ['', '']);
+  assert.equal(await page.locator('.planned-set-row input').first().inputValue(), '42', 'Adding another exercise preserves edited targets');
+  await page.locator('#presetForm button[type="submit"]').click();
+  await waitSaved();
+  await page.reload();
+  await page.locator('.preset-card').filter({ hasText: 'History preset UAT' }).getByRole('button', { name: 'Edit History preset UAT', exact: true }).click();
+  assert.equal(await page.locator('.planned-set-row input').first().inputValue(), '42', 'Saved targets are not overwritten on edit or reload');
+  assert.deepEqual(await page.locator('.planned-set-previous').allTextContents(), ['Last time: 25 kg × 8', 'Last time: 25 kg × 9', 'Last time: 30 kg × 8']);
+  // Adding typed names while modifying an existing preset uses the same history.
+  await page.locator('#presetExerciseInput').fill('Leg curl');
+  await page.locator('#addPresetExerciseButton').click();
+  assert.match(await page.locator('.draft-exercise').last().textContent(), /Last time: 5 min/);
+  assert.deepEqual(await page.locator('.draft-exercise').last().locator('input[type="number"]').evaluateAll((inputs) => inputs.map((input) => input.value)), ['', ''], 'Time history is not converted into weight or reps');
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 844 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Preset history fits at ${width}px`);
+  }
+  if (process.env.SCHNEGGEN_PRESET_SCREENSHOT) await page.screenshot({ path: process.env.SCHNEGGEN_PRESET_SCREENSHOT, fullPage: true });
+  await page.locator('#presetForm button[type="submit"]').click();
+  await waitSaved();
+  assert.deepEqual((await state()).records, history, 'Preset creation and editing never rewrite history');
+  await page.setViewportSize({ width: 1100, height: 1100 });
   await presetCard.locator('.start-workout-button').click();
   squat = await openExercise('Smith squat');
   assert.deepEqual(await squat.locator('.previous-set').allTextContents(), ['Last time: 25 kg × 8', 'Last time: 25 kg × 9', 'Last time: 30 kg × 8']);
@@ -194,6 +227,17 @@ try {
   await phone.locator('#completionPanel').waitFor({ state: 'visible' });
   assert.equal(await phone.locator('.completion-bar').count(), 2);
   assert.deepEqual(failures, []);
+  const isolated = await browser.newContext();
+  const other = await isolated.newPage();
+  await other.goto(base);
+  await other.locator('#profileNameInput').fill('Other UAT profile');
+  await other.locator('#profileForm button').click();
+  await other.locator('#newPresetButton').click();
+  await other.locator('#presetExerciseInput').fill('Smith squat');
+  await other.locator('#addPresetExerciseButton').click();
+  assert.deepEqual(await other.locator('.planned-set-row input').evaluateAll((inputs) => inputs.map((input) => input.value)), ['', ''], 'History does not leak between profiles');
+  assert.equal(await other.locator('.planned-set-previous').count(), 0);
+  await isolated.close();
   console.log('PASS: English UI; preset rename and real drag; accordion; per-set history; out-of-order logging and undo; configurable +/- and copy; inline edit; timer +30/skip/reload; both template-edit scopes; central settings/feedback; 390/320px layout; sticky title; touch reorder; completion totals/graph/reload; old history unchanged.');
 } catch (error) {
   if (page && process.env.SCHNEGGEN_SCREENSHOT) await page.screenshot({ path: process.env.SCHNEGGEN_SCREENSHOT, fullPage: true });

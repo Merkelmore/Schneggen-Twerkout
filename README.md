@@ -14,6 +14,7 @@ Production: [schnegge.strotzenheim.com](https://schnegge.strotzenheim.com)
 - a central volume dashboard comparing weekly totals and repeated preset workouts, plus exercise-level daily best graphs;
 - workout streaks, today's summary, editable history, and custom exercise names;
 - searchable workout presets with ordered exercises, planned set/weight/rep rows, three starter routines, and set-by-set progress;
+- newly added preset exercises reuse the last session's set-by-set weights/reps, with a compact last-time reference; existing targets stay unchanged;
 - per-profile workout plans using weekday assignments or a repeating preset order, with a suggested one-tap start card;
 - per-set last-time values, using the latest exercise session and stable slot numbers; planned targets take precedence over previous values when prefilling;
 - persistent workout title and overview from the first set, with any-order exercise selection;

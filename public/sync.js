@@ -1,19 +1,19 @@
-import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=12';
+import { STORAGE_KEY, mergeRecords, normaliseRecord, sortRecords } from './data.js?v=13';
 import {
   ACTIVE_WORKOUT_STORAGE_KEY,
   FIRST_VISIT_STORAGE_KEY,
   PRESET_STORAGE_KEY,
   normaliseActiveWorkout,
   normalisePresets,
-} from './presets.js?v=12';
+} from './presets.js?v=13';
 import {
   WORKOUT_PLAN_STORAGE_KEY,
   mergeWorkoutPlans,
   normaliseWorkoutPlan,
-} from './plans.js?v=12';
-import { normaliseProfileName } from './profiles.js?v=12';
-import { FEEDBACK_STORAGE_KEY, normaliseFeedback, mergeFeedback } from './feedback.js?v=12';
-import { TRAINING_STORAGE_KEY, normaliseTraining, mergeTraining } from './training.js?v=12';
+} from './plans.js?v=13';
+import { normaliseProfileName } from './profiles.js?v=13';
+import { FEEDBACK_STORAGE_KEY, normaliseFeedback, mergeFeedback } from './feedback.js?v=13';
+import { TRAINING_STORAGE_KEY, normaliseTraining, mergeTraining } from './training.js?v=13';
 
 const SYNC_META_PREFIX = 'schneggen-server-sync-v1:';
 

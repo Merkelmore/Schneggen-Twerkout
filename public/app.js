@@ -12,12 +12,12 @@ import {
   sortRecords,
   todaySummary,
   weeklyVolumeSeries,
-} from './data.js?v=12';
+} from './data.js?v=13';
 
-import { createProfileManager } from './profiles.js?v=12';
-import { prepareProfileStorage } from './sync.js?v=12';
-import { createWorkoutController } from './workouts.js?v=12';
-import { createFeedbackController } from './feedback.js?v=12';
+import { createProfileManager } from './profiles.js?v=13';
+import { prepareProfileStorage } from './sync.js?v=13';
+import { createWorkoutController } from './workouts.js?v=13';
+import { createFeedbackController } from './feedback.js?v=13';
 
 const $ = (selector, parent = document) => parent.querySelector(selector);
 const $$ = (selector, parent = document) => [...parent.querySelectorAll(selector)];
